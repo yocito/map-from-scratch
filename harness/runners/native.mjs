@@ -1,5 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { ppmToPng } from '../lib/png.mjs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { Collector, parseLine } from '../lib/protocol.mjs';
@@ -36,7 +37,7 @@ function runOnce(root, spec, outDir, i, collector) {
       const r = JSON.parse(readFileSync(resultFile, 'utf8'));
       if (r.exit_code !== 0) collector.add({ error: `exit ${r.exit_code} signal ${r.signal}` });
       collector.add({ metric: 'wall_ms', value: r.wall_ms });
-      collector.add({ metric: 'cpu_ms', value: r.user_ms + r.sys_ms });
+      collector.add({ metric: 'process_cpu_ms', value: r.user_ms + r.sys_ms });
       collector.add({ metric: 'peak_rss_mb', value: r.maxrss_kb / 1024 });
       resolve();
     });
@@ -46,5 +47,10 @@ function runOnce(root, spec, outDir, i, collector) {
 export async function benchNative(root, spec, outDir, { iterations }) {
   const collector = new Collector();
   for (let i = 0; i < iterations; i++) await runOnce(root, spec, outDir, i, collector);
+  const ppm = join(outDir, 'screenshot.ppm');
+  if (existsSync(ppm)) {
+    writeFileSync(join(outDir, 'screenshot.png'), ppmToPng(readFileSync(ppm)));
+    rmSync(ppm);
+  }
   return collector.result();
 }

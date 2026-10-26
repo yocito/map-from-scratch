@@ -9,7 +9,7 @@ RUN apt-get update \
       build-essential \
       rustc cargo \
       chromium \
-      libvulkan1 libegl1 libgles2 \
+      libvulkan1 libegl1 libgles2 libegl-dev libgles-dev libx11-dev \
       gdal-bin \
       osmium-tool \
       procps \
