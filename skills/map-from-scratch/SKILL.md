@@ -83,11 +83,25 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    `ogr2ogr`, `osmium`. Local copies: z.yuiseki.net/static is
    `/sata_hdd_24tb/www/html/static/`, Hugging Face datasets of yuiseki are
    under `/sata_hdd_24tb/hf_data/__published/`.
-4. **Look it up in ref-repos.** For each sub-problem of the design (line
-   joins, polygon fill, tile decoding, label placement, picking, projection,
-   globe camera), search `ref-repos/` (`rg -l` by concept, then read the few
-   files that implement it) and note in `performance_knowledge` or a code
-   comment which engine's approach you took or rejected and why.
+4. **Look it up in the know-how, then in ref-repos.** For each sub-problem of
+   the design (line joins, polygon fill, tile decoding, label placement,
+   picking, projection, globe camera), first read the matching know-how skill
+   in `.agents/skills/<topic>/SKILL.md`: decisions, trade-offs and reversals
+   mined from the issues, pull requests and commit logs of the 48 engines,
+   each claim with its source. Topics: 3d-buildings-and-meshes,
+   3d-tiles-and-hlod, animation-and-camera, antialiasing-and-blending,
+   api-design-and-extensibility, data-range-requests, draw-order-and-depth,
+   float-precision, gpu-memory-and-batching, label-placement,
+   line-tessellation, mobile-and-power, picking-and-hit-testing,
+   point-rendering-and-clustering, polygon-triangulation,
+   projection-and-globe, raster-tiles, simplification-and-generalization,
+   startup-and-bundle-size, style-and-expressions, symbols-and-icons,
+   terrain-and-elevation, testing-and-benchmarking, text-rendering,
+   tile-cache-and-loading, tile-lod-and-overzoom, vector-tile-encoding,
+   worker-threading; and yuiseki-open-data for the data itself. Then search
+   `ref-repos/` (`rg -l` by concept, then read the few files that implement
+   it) for the code, and note in `performance_knowledge` or a code comment
+   which engine's approach you took or rejected and why.
 5. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
    `spec.yaml`, `REQUEST.md` (the narrative: design and what was learnt),
    `bake.ts`, the renderer, and for browser examples `index.html` that loads

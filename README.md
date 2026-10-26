@@ -8,7 +8,7 @@
 - 外部ライブラリは使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
 - 各例を `spec.yaml` で定義する。要件 (requirements)、評価 (evaluation)、計測 (benchmarks)、データ (datasets)、性能の知見 (performance_knowledge)、構成の選択 (architecture_selection)、検証 (verification) の 7 節からなる。
 - 要件はすべて、測定値の上限や下限 (予算) にし、ハーネスが毎回測って合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。
-- 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 47) の解き方を読んで参考にする。
+- 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 48) の解き方を読んで参考にする。
 
 ## 例
 
@@ -80,6 +80,8 @@ tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて 
 ```
 
 新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
+
+`ref-repos/` の 48 エンジンの issue、pull request、コミットログから、設計の判断とその代償、試して取りやめたことを話題ごとに抜き出し、[.agents/skills/](.agents/skills/) に 28 のスキル (ラベル配置、浮動小数点の精度、地形、3D 建物、Range リクエストなど) としてまとめています。どの主張にも出典を付け、出典と照らし合わせて確かめてあります。データの置き場所は [yuiseki-open-data](.agents/skills/yuiseki-open-data/SKILL.md) にあります。`.claude/skills` は `.agents/skills` へのリンクです。
 
 ## ハーネス
 
