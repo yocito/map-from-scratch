@@ -26,6 +26,10 @@ export function serve(root, port = 0, host = '127.0.0.1') {
         'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
         'content-length': size,
         'cache-control': 'no-store',
+        // Cross-origin isolation: performance.now() gets 5 us resolution
+        // instead of 100 us, which sub-millisecond frame times need.
+        'cross-origin-opener-policy': 'same-origin',
+        'cross-origin-embedder-policy': 'require-corp',
       });
       createReadStream(file).pipe(res);
     } catch {

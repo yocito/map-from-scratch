@@ -132,7 +132,8 @@ async function main(argv) {
       return r.errors.length ? 1 : 0;
     }
     case 'test': {
-      const tests = readdirSync(join(root, 'harness/test')).filter((f) => f.endsWith('.test.mjs')).map((f) => join(root, 'harness/test', f));
+      const tests = ['harness/test', 'tools/test'].flatMap((d) =>
+        readdirSync(join(root, d)).filter((f) => f.endsWith('.test.mjs')).map((f) => join(root, d, f)));
       return spawnSync(process.execPath, ['--test', ...tests], { stdio: 'inherit' }).status;
     }
     default:

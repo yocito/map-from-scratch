@@ -13,6 +13,7 @@ RUN apt-get update \
       gdal-bin \
       osmium-tool \
       procps \
+      fonts-noto-cjk \
  && rm -rf /var/lib/apt/lists/*
 
 ENV CHROME_BIN=/usr/bin/chromium
