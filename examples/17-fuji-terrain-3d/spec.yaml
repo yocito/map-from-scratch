@@ -1,0 +1,364 @@
+id: 17-fuji-terrain-3d
+request: >-
+  富士山のまわりの地形を、3D で斜めから眺めたい。PC のブラウザで、なめらかに回したい。
+
+requirements:
+  - id: see-fuji-3d
+    need: 富士山のまわりの地形を 3D で斜めから眺めたい
+    rationale: >-
+      近くから見たときに最も細かい段 (L0、15.6 m) まで降りていること。close 視点 (距離 12 km、pitch 25°) で
+      L0 が 50 チャンク以上 (見積もり 90) 選ばれ、すべて代替なしで描けていること
+  - id: smooth-rotate
+    need: なめらかに回したい
+    rationale: >-
+      120 Hz の 1 フレーム 8.3 ms。GPU は 4 ms 以内、JS は 2 ms 以内。最も重い low 視点 (pitch 10°) と close 視点も同じ 8.3 ms。
+      先読みのない回転とズームでは、読み込みと復号を挟んだ 1 フレームの全費用 (rAF の間隔) が p95 で 8.3 ms 以内、
+      最大でも 60 Hz で落とすのは 1 フレームまで (33.3 ms)。先読みが終わる前に回し始めても、目的の段が読めておらず粗い段で
+      代わりに描くフレームは回転の 10% 以内 (2 秒の 1 周で 200 ms 分)、ズームでは 35% 以内
+  - id: quick-start
+    need: すぐ出る (依頼にはないが、データを Range で読む以上、最初の絵までの時間が体験を決める)
+    rationale: >-
+      fast (20 ms、50 Mbps) でページ遷移から完全な絵まで 600 ms 以内 (見積もり約 330 ms)、粗い絵は 250 ms 以内
+  - id: few-bytes
+    need: 見ている範囲の分だけ読む (原本の WebP タイルを読むより少なく)
+    rationale: >-
+      同じ視点を原本で読むときのバイト数の 0.35 倍以下 (見積もり 0.22)、データ経路の時間は 0.5 倍以下。
+      最初の視点は 1.1 MB、20 リクエスト以内 (範囲の結合の間隔は 8 KiB。performance_knowledge の range-gap)。
+      配るページは最初の視点のあと回転の先読みもするので、訪問者が開いて待つだけで読むバイト数 (視点と先読み) も 2 MB 以内、
+      原本で同じチャンクを読むときの 0.35 倍以下
+  - id: pages-static
+    need: GitHub Pages に静的ファイルとして置ける
+    rationale: データは 1 ファイル 95 MB 未満、全体 9 MB 以内 (見積もり 7.83 MB)
+  - id: light
+    need: 配るコードは小さく
+    rationale: 汎用エンジンの 100 分の 1 以下を目安に gzip 12 KB
+  - id: gpu-modest
+    need: GPU メモリを控えめに (空きは約 1 GB で、ほかのエージェントと共有)
+    rationale: ページ自身の見積もりで 64 MB 以内 (テクスチャ 26.3 MB と 4x MSAA の既定フレームバッファー)、JS ヒープ 40 MB 以内
+  - id: pc-browser
+    need: PC のブラウザで
+    unmeasured: 端末ではなく、benchmarks の画面 (1280×800、DPR 1、CPU スロットルなし) で代わりに測る
+  - id: correct
+    need: 正しく出ている
+    unmeasured: verification.checks で確かめる (DuckDB の真値との照合、原本との比較、穴と継ぎ目の検査)
+
+evaluation:
+  budgets:
+    - {metric: close_l0_chunks, stat: min, min: 50, requirement: see-fuji-3d}
+    - {metric: gpu_ms, stat: p95, max: 4, unit: ms, requirement: smooth-rotate}
+    - {metric: frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-rotate}
+    - {metric: cpu_ms, stat: p95, max: 2, unit: ms, requirement: smooth-rotate}
+    - {metric: low_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-rotate}
+    - {metric: close_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-rotate}
+    - {metric: orbit_cold_interval_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-rotate}
+    - {metric: orbit_cold_interval_max_ms, stat: max, max: 33.3, unit: ms, requirement: smooth-rotate}
+    - {metric: zoom_cold_interval_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-rotate}
+    - {metric: input_ms, stat: p95, max: 4, unit: ms, requirement: smooth-rotate}
+    - {metric: fallback_frames, stat: max, max: 0, requirement: smooth-rotate}
+    - {metric: orbit_cold_fallback_ratio, stat: max, max: 0.1, requirement: smooth-rotate}
+    - {metric: zoom_cold_fallback_ratio, stat: max, max: 0.35, requirement: smooth-rotate}
+    - {metric: first_frame_ms, stat: p50, max: 600, unit: ms, requirement: quick-start}
+    - {metric: first_coarse_frame_ms, stat: p50, max: 250, unit: ms, requirement: quick-start}
+    - {metric: range_bytes_first, stat: max, max: 1100000, unit: B, requirement: few-bytes}
+    - {metric: range_requests_first, stat: max, max: 20, requirement: few-bytes}
+    - {metric: bytes_ratio_first, stat: max, max: 0.35, requirement: few-bytes}
+    - {metric: first_frame_ratio, stat: max, max: 0.5, requirement: few-bytes}
+    - {metric: range_bytes_orbit_cold, stat: max, max: 2200000, unit: B, requirement: few-bytes}
+    - {metric: range_bytes_visit, stat: max, max: 2000000, unit: B, requirement: few-bytes}
+    - {metric: bytes_ratio_visit, stat: max, max: 0.35, requirement: few-bytes}
+    - {metric: data_bytes, max: 9000000, unit: B, requirement: pages-static}
+    - {metric: code_gzip_bytes, max: 12000, unit: B, requirement: light}
+    - {metric: gpu_mem_est_mb, stat: max, max: 64, unit: MB, requirement: gpu-modest}
+    - {metric: js_heap_mb, stat: max, max: 40, unit: MB, requirement: gpu-modest}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/17-fuji-terrain-3d/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  network: {name: fast, latency_ms: 20, download_mbps: 50}
+  cpu_throttle: 1
+  iterations: 3
+  timeout_ms: 180000
+  scenarios:
+    - id: first-frame
+      what: >-
+        ページの遷移開始 (performance.now の原点) から、default 視点 (北から南南西を見る、pitch 28°、距離 40 km) で
+        選んだチャンクがすべて目的の段で描けたフレームの終わり (1 画素の readPixels で同期) まで。計測用コードの
+        読み込みは含めない (bench.ts はその後に読む)。粗い絵も同じ原点から、画面の全体を何かの段で覆えた最初のフレーム
+        (選択の uncovered が 0。1 リクエスト目の L3 の 9 チャンクを復号したあと) の終わりまで測る。何も描けていない空のフレームは数えない
+      metrics: [first_frame_ms, first_coarse_frame_ms, range_requests_first, range_bytes_first]
+    - id: orig-first
+      what: >-
+        読み込み済みのものを捨て、default 視点を自前の形式と原本 (Mapterhorn の planet.pmtiles、ローカルの実ファイルを
+        同じサーバーと同じネットワーク条件で Range 読み) でそれぞれ最初から読む。どちらも最初のリクエストから
+        描画の終わりまで。原本はヘッダーと root (16 KiB)、leaf ディレクトリ、タイル、ブラウザでの WebP 復号を含む
+      metrics: [data_first_frame_ms, orig_data_first_frame_ms, orig_range_requests_first, orig_range_bytes_first, orig_decode_ms, bytes_ratio_first, first_frame_ratio]
+    - id: views-cold
+      what: far (60 km)、close (12 km、注視点 3000 m)、low (pitch 10°)、top (真上 70 km) を、何もない状態から自前と原本で読む
+      metrics: [range_bytes_far, range_requests_far, orig_range_bytes_far, range_bytes_close, orig_range_bytes_close, range_bytes_low, orig_range_bytes_low, range_bytes_top, orig_range_bytes_top, close_l0_chunks]
+    - id: fixed
+      what: 上の 4 視点で止めた 60 フレーム
+      metrics: [far_frame_ms, close_frame_ms, low_frame_ms, top_frame_ms, low_gpu_ms]
+    - id: visit
+      what: >-
+        配るページが default 視点を開いて待つあいだに読むもの。何もない状態から default を読み、続けて回転の先読み
+        (配るページでは静止して 300 ms 後に始まる。?bench ではタイマーを止めているので手で呼ぶ) を読み終えるまでのバイト数とリクエスト数。
+        原本は同じチャンク (視点と先読みの和) を含むタイルを最初から読む
+      metrics: [range_bytes_visit, range_requests_visit, orig_range_bytes_visit, bytes_ratio_visit]
+    - id: orbit
+      what: >-
+        回転の先読み (同じ注視点、pitch、距離で 2° ごとに 180 回選んだチャンクの和集合) のあと、default の距離で
+        3° ずつ 120 フレームかけて 1 周
+      metrics: [frame_ms, gpu_ms, cpu_ms, selection_ms, fallback_frames]
+    - id: orbit-cold
+      what: >-
+        先読みなしで default を読み、rAF の実時間で 2 秒に 1 周。足りないチャンクはその場で読む。ハーネスの Chromium は
+        vsync もフレームレートの上限もないので、毎 rAF で描いて 1 画素の readPixels で GPU の完了を待つ。rAF の間隔は、
+        描画と、その間に走った復号の切れ端とネットワークのコールバックを合わせた 1 フレームの全費用になる。
+        選んだチャンクのうち未読のものがあり粗い段で代わりに描いたフレームの割合も数える
+      metrics: [orbit_cold_interval_ms, orbit_cold_interval_max_ms, range_bytes_orbit_cold, range_requests_orbit_cold, orbit_cold_fallback_ratio]
+    - id: zoom-cold
+      what: 先読みなしで default を読み、2 秒かけてホイールイベントで 40 km から 10 km へ寄る (間隔と代わりに描いたフレームの測り方は orbit-cold と同じ)
+      metrics: [zoom_cold_interval_ms, range_bytes_zoom_cold, zoom_cold_fallback_ratio]
+    - id: input
+      what: 合成した pointermove の発行から、そのフレームの描画命令を出し終えるまで (rAF の待ちは含めない)
+      metrics: [input_ms]
+    - id: ceiling
+      what: 765 チャンクをすべて読み、top 視点で τ=0 にして L0 の 576 チャンクを全部描く。LOD が要るかどうかの根拠
+      metrics: [ceiling_gpu_ms, ceiling_frame_ms, ceiling_tris]
+
+datasets:
+  bake: [node, examples/17-fuji-terrain-3d/bake.ts]
+  sources:
+    - id: mapterhorn-planet
+      origin: >-
+        Mapterhorn の全球標高 PMTiles (2026-01-06 版、663,868,447,387 B、z0-12、512 px の WebP lossless、Terrarium)。
+        手元の /sata_hdd_24tb/www/html/static/mapterhorn/2026-01-06/planet.pmtiles を tools/pmtiles.ts で Range 読みする
+        (tools/sources.ts にはまだ登録していない。コピーしない種類の原本が要る)
+      license: >-
+        Mapterhorn の表示は "© Mapterhorn"。download.mapterhorn.com/attribution.json (2026-10-27 に取得) では、日本の部分の元データは
+        国土交通省国土地理院の基盤地図情報 (数値標高モデル、jpdem1a/5a/5b/5c/10a/10b) で、条件は「国土地理院コンテンツ利用規約／
+        測量法に基づく国土地理院長承認（使用）R 8JHs 131」。承認は Mapterhorn の使用についてのもので、この焼き直しを再配布してよいか
+        (出典の表示だけで足りるか、測量成果の複製・使用の承認が要るか) は人が判断する。判断が出るまで Pages には公開しない。
+        ハーネスには例ごとに公開を止める仕組みがなく、tools/deploy-pages.sh は outputs をすべて .cache/site に写すので、公開の可否は
+        deploy-pages.sh を走らせる人に頼っている (今は 17 の bench --site が失敗するので、--no-check を付けない限り push まで進まない)
+  outputs: [data/baked/17-fuji-terrain-3d/fuji.terr]
+  preparation:
+    - 区画は z12 のタイル 6x6 (x 3624-3629、y 1614-1619)。138.5156-139.0430E、35.1738-35.6037N、3072x3072 標本、47.86 km 四方
+    - 外周 1 周を含む z12 タイル 64 枚 (23.3 MB) を Range で読み、GDAL の WEBP ドライバー (libwebp) で VRT モザイクにして生のバイトにする (gdal_translate -of ENVI)
+    - Terrarium の整数 R*65536+G*256+B を 2^k x 2^k で平均して段 k を作る (原本の z(12-k) と同じ標本)。量子化は floor(h / (0.25 * 2^k) + 0.5)
+    - 128 セルのチャンクごとに 131x131 標本 (頂点 129x129 と、法線のための縁 1 標本。縁も実データ) を、平面予測 a+b-c の残差の Rice 符号 (32 標本ごとの k) にする
+    - スカートの深さは、辺の頂点の高さと、そこから 16 標本以内の L0 の最小との差の最大 (2 m 単位)
+    - 粗い段から (L3 9、L2 36、L1 144、L0 576)、段の中は Morton 順に並べる。先頭 64 B のヘッダーと 1 チャンク 8 B の索引 (長さ、hmin、hmax、スカート)
+    - 真値は DuckDB で別に作る。GDAL の XYZ 出力を floor(x)、floor(y) で結合し、avg で段を作り、チャンクの min/max/sum と 124 地点の近傍を出す。Node の結果と 1 つでも違えばベイクは失敗する
+    - ベンチ用に truth.json と orig-costs.json (原本の同じ視点のタイルとディレクトリのバイト数を実ファイルから数えたもの) を書く。outputs には入れない
+
+performance_knowledge:
+  - id: format-vs-original
+    finding: 見えている範囲の量子化した高さだけを Range で読む形式は、同じ視点を原本の WebP タイルで読むより 4〜5 倍少ないバイトで、データ経路も 4 倍速い
+    evidence: >-
+      同じ選択 (τ=1.5 px) と同じ標本で、ローカルの 664 GB の実ファイルを同じサーバーとネットワーク条件 (20 ms、50 Mbps) で読んだ実測。
+      default: 自前 971,400 B / 18 リクエスト / 225 ms (p50、3 回)、原本 4,963,388 B / 17 リクエスト / 891 ms (うちブラウザの WebP 復号 105 ms)。
+      バイト比 0.196、時間比 0.252。far 736 KB 対 2,626 KB、close 1,160 KB 対 4,782 KB、low 1,467 KB 対 6,485 KB、top 473 KB 対 1,824 KB。
+      原本のバイト数はベイク時に tools/pmtiles.ts で実ファイルから数えた orig-costs.json とバイト単位で一致した。
+      差の内訳は、原本の z12 が 11.2 bit/標本 (1/256 m の端数が雑音)、自前が約 4.7 bit/標本 (0.25*2^k m に量子化して平面予測と Rice)、
+      それにチャンク 128 セルとタイル 512 px の粒度の差
+    applies_when: 標高を原本のタイルから自前の形式に焼き直せて、必要な精度が原本の 1/256 m より粗いとき
+  - id: rice-coding
+    finding: 平面予測 a+b-c の残差を 32 標本ごとの k で Rice 符号にすると、deflate より小さく、同期で速く復号できる
+    evidence: >-
+      fuji.terr 7,829,053 B (L0 5,856,282、L1 1,499,826、L2 374,946、L3 91,815、ヘッダーと索引 6,184)。設計時の比較で deflate-raw は L0 が 7% 大きく、
+      MED 予測は 6.7% 大きく、生の 16 bit は 19.76 MB。Node 24 で 0.22 ms/チャンク (131x131)。ブラウザでは復号とテクスチャへの転送を合わせて
+      765 チャンクで 453 ms (0.59 ms/チャンク)。ベイクは全チャンクの往復と、ビューごとの範囲読みを実ファイルで確かめる
+    applies_when: 滑らかな格子の整数を、ブラウザの圧縮ストリームを待たずに少しずつ復号したいとき
+  - id: range-gap
+    finding: 20 ms、50 Mbps では、リクエストを減らすより余計なバイトを減らすほうが最初の絵が早い。範囲の結合は 8 KiB が最良だった
+    evidence: >-
+      default の data_first_frame_ms と最初の視点のバイト数。gap 0: 229 ms、19 リクエスト、963 KB (1 回)。8 KiB: 224 ms (3 回とも 222〜225)、18、971 KB。
+      32 KiB (設計時の案): 241 ms (3 回とも 239〜243)、10、1,109 KB。128 KiB: 363 ms、3、1,630 KB。ローカルサーバーは HTTP/1.1 で、6 本を超えた分は待ち行列に入る
+    applies_when: 遅延が小さく帯域が律速のネットワークで、粗い段の後に細かい段を Morton 順で並べたファイルを Range で読むとき。遅延が大きい回線では測り直す
+  - id: early-first-request
+    finding: 最初のリクエスト (ヘッダー、索引、L3) を index.html のインラインスクリプトで始めると、モジュールの取得と並行になり、最初の絵が 20 ms ほど早くなる
+    evidence: 3 回ずつ。インラインで開始 first_frame_ms 315/320/345 (p50 320)、粗い絵 115/129/207。main.ts で開始 342/342/418 (p50 342)、粗い絵 140/142/221
+    applies_when: 最初に読む範囲がページを書く時点で決まっているとき (ここでは先頭 96 KiB に L3 の最後 97,999 B まで入る)
+  - id: lod-edge-gap
+    finding: >-
+      どの段でも頂点を標本の中心に置くと、段の違うチャンクの境目に 0.5*(2^k - 2^k') px の溝ができ (L0 と L1 で 7.8 m)、
+      縦のスカートでは上から見て塞げない。辺の頂点だけをチャンクの枠の上に置き、枠をまたぐ 2 標本 (角は 4 標本) の平均の高さにすると塞がる
+    evidence: >-
+      回転中の 12 地点の穴の検査で、直す前は yaw 290° で 125 画素 (区画の外縁の見え方と混ざっていて、溝の分は切り分けていない)。
+      直したあとは 39 画素で、記録した最初の 6 画素はすべて区画の南端の稜線のあいだ (外縁の向こうは何もない) だった。外縁から 400 m 以内の地形に挟まれた画素を
+      除くと全視点で 0。同じ段の隣どうしは縁の標本から同じ平均を出すので継ぎ目はなく、陰影の段差の比は 1.056 (対照線との比)。
+      真値との照合も同じ頂点の置き方で補間し、最大の差 3.2 mm
+    applies_when: 標本の中心を頂点にした格子で、段の違うチャンクを並べるとき
+  - id: skirt-depth
+    finding: スカートは、辺の頂点の高さと、その周り 16 標本 (250 m) の L0 の最小との差で決めた。ベイクなら全部測れる (iTowns は実行時には重すぎると書いた)
+    evidence: 765 チャンクで最大 368 m、中央値 194 m (2 m 単位で u8)。山地では窓の中の起伏がそのまま深さになる。穴は全視点で 0。スカートだけの GPU の費用は測っていない
+    applies_when: LOD の段差をスカートで隠すとき。窓を細くすればもっと浅くできるが、比べていない
+  - id: orbit-prefetch
+    finding: 依頼が「回したい」なので、静止して 300 ms 後に、同じ注視点、pitch、距離で 2° ごとに 180 回選んだチャンクの和集合を先読みする。回しても粗い絵に戻らない
+    evidence: >-
+      default で 162 チャンク、1,691,156 B (設計時の「L2 と L1 の残り全部、1.87 MB」より少なく、近くに要る L0 も含む)。
+      L1 と L2 だけを先読みした最初の版は、3° 刻みの 120 フレームで 3 フレームが代替描画だった (L0 が足りない)。和集合にしてから 0。
+      選択 1 回は p50 0.05 ms なので 180 回で約 10 ms、静止後なので操作は止めない
+    applies_when: 視点の動きが軌道 (回転) に限られると読めるとき
+  - id: lod-ceiling
+    finding: 全部 L0 で描いても GPU は 4.5 ms で、120 Hz の 8.3 ms には収まる。LOD の得は GPU よりバイト数にある
+    evidence: >-
+      ceiling (top 視点、τ=0、L0 576 チャンク、1,950 万三角形): gpu_ms p50 4.50 ms、frame_ms 5.1 ms。LOD の orbit (最大 328 万三角形) は gpu p50 1.65 ms、
+      最も重い low 視点で 1.63 ms。全部を読むと 7,829,358 B を 3 リクエスト、1.5 秒。default の 1 視点は 971 KB
+    applies_when: RTX 3060 級の GPU で 4x MSAA、1280x800。モバイルや大きい画面では測り直す
+  - id: unthrottled-raf
+    finding: ハーネスの Chromium は vsync もフレームレートの上限もないので、rAF の間隔をそのまま測ると描画器ではなくブラウザを測ってしまう
+    evidence: >-
+      毎 rAF で描くだけだと間隔は 0.2 ms で、GPU の待ち行列があふれて 743 ms と 937 ms の停止が出た。rAF を読み飛ばして 60 Hz を真似ると、
+      描かない rAF は約 18 ms 間隔になり、間隔の p95 が 18.4 ms という見かけの値になった。毎 rAF で描いて 1 画素の readPixels で待つと、
+      間隔は 1 フレームの全費用 (最終計測で orbit-cold p50 1.48 ms、最大 9.0 ms、zoom-cold p95 3.7 ms、最大 5.5 ms) になる。
+      ただしアイドルのあとの最初の rAF は約 17 ms 後に来るので、先に 1 フレーム描いてから測る
+    applies_when: このハーネスで rAF の実時間に沿ったアニメーションを測るとき
+  - id: aerial-perspective
+    finding: 距離だけの霧 (設計時の exp(-d/45 km)) は 40 km 先の眺めを白くし、真上の視点で陰影の差を消した。空気の密度 exp(-z/8 km) を視線に沿って平均した霧にした
+    evidence: >-
+      exp(-d/120 km) の距離だけの霧で、top 視点 (70 km 上) の北西向きと南東向きの斜面の明るさの差は 29.3 (検査は 30 以上)。密度で重みを付けて 46.9
+    applies_when: 高い所から見下ろす視点と、低く遠くを見る視点の両方があるとき
+  - id: browser-webp-exact
+    finding: createImageBitmap(blob, {colorSpaceConversion:'none', premultiplyAlpha:'none'}) で復号した Terrarium の WebP は、GDAL (libwebp) の復号と 1 ビットも違わない
+    evidence: close 視点で原本を読み、z12 タイルのテクスチャを readPixels して truth の 81 地点の R*65536+G*256+B を比べ、81 地点とも一致 (3 回とも)
+    applies_when: 原本の WebP をブラウザで読む比較の側。プライバシー強化のブラウザでのキャンバス経由の読み出しは試していない
+  - id: gpu-memory
+    finding: ページ自身の GPU メモリの見積もりは 60.4 MB。nvidia-smi で見た Chromium の GPU プロセス全体はベンチ中に 158〜206 MiB
+    evidence: >-
+      見積もり: R16UI 131x131x765 のテクスチャ 26.3 MB、インデックス 0.2 MB、4x MSAA の既定フレームバッファー (色と深度ステンシルを標本ごと、
+      それに解決先) 33.9 MB。ベンチはこのほかに読み戻し用の 20.5 MB と原本のタイル (最大 17 枚、17 MB) を使う。
+      同じ時刻に別のコンテナの headless Chromium の GPU プロセスは 106 MiB で一定だった。ページの分だけを nvidia-smi で切り分ける方法はない
+    applies_when: GPU を他の処理と分け合うとき
+  - id: summit-height
+    finding: 山頂の標本は 3770.81 m で、実際の 3776 m より 5 m 低い。15.6 m 四方の平均だから
+    evidence: DuckDB の arg_max と Node の最大がともに (列 1233、行 1739)、138.72737E 35.36057N。close 視点で L0 で描かれ、画面の 5x5 の最大の高さ 3770.005 m
+    applies_when: DEM の最高点を名所の標高と比べるとき
+  - id: know-how-decisions
+    finding: .agents/skills のうち従ったものと、意図して採らなかったもの
+    evidence: >-
+      terrain-and-elevation: WebP はベイクで復号し整数の高さを配る [7][114]、チャンクごとの min/max を索引に置く [75]、N+1 格子とインデックスを共有 [97][89]、
+      スカートはベイクで測った差から [74]、縁 1 標本 (MapLibre の backfillBorder [1]。陰影をバイリニアで引かないので 1 で足りる、seam-shading で確認)、
+      目の高さは CPU に持つ値で (索引の hmax) [11]、急な視点と高い pitch を固定視点で測る、継ぎ目の検査 [19]。
+      data-range-requests: 索引を先頭に、粗い段を先頭に、範囲を結合、読み手をバイト列の純関数に (bake.ts が実ファイルで範囲読みを確かめる)、
+      range の指標を出す、全部を読む場合とも比べる (lod-ceiling)。tile-lod-and-overzoom: SSE は垂直 FOV で、距離は AABB まで、選択を near/far に結び付けない。
+      3d-tiles-and-hlod: 途中の段を読み飛ばし葉だけ取る、置き換え式の詳細化、close で最深の段に届くかを検査。gpu-memory-and-batching: インスタンス描画 1 回、u16 インデックス、gl_VertexID。
+      float-precision: 原点は区画の中心 1 つ (最大 34 km で float32 の刻み 2 mm、真値との差 3.2 mm 以内)。animation-and-camera: rAF は 1 本で静止中は描かない、pitch を 8〜89° に制限、目を地表の 150 m 上に。
+      採らなかったもの: ベイクした陰影ラスター (3D なので頂点ごとの法線のほうが少ないバイト)、CDLOD と geomorph (ortho-earth は勧めていない [50]。ポップは目視で未確認)、
+      フラグメントごとの Sobel、worker (復号は 4 ms ずつに切って主スレッドで。worker のリクエストはハーネスが数えない)、再投影 (Mercator の格子を中心の縮尺で)
+    applies_when: 地形を 3D で描く次の例で、どの判断を引き継ぐか決めるとき
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2 (R16UI のテクスチャ配列、インスタンス描画 1 回、gl_VertexID)
+    language: TypeScript (ES modules、ビルドなし。配るときは型を外すだけ)
+    gpu: hardware
+    code: [examples/17-fuji-terrain-3d/index.html, examples/17-fuji-terrain-3d/main.ts, examples/17-fuji-terrain-3d/terrain.ts, examples/17-fuji-terrain-3d/gl.ts, examples/17-fuji-terrain-3d/views.ts]
+    dependencies: []
+    why: >-
+      斜めから見る 3D なので、近くは細かく遠くは粗くしないと三角形が多すぎる (全部 L0 で 1,900 万三角形)。
+      高さはベイクで量子化した整数を 1 ファイルに並べ、見えている範囲のチャンクだけを Range で読む。
+      どのチャンクも同じ 129x129 の格子なので、インデックスを共有し、高さをテクスチャから引いて 1 回の描画で済ませる
+  alternatives:
+    - option: 原本の WebP タイルをそのまま読む (MapLibre の raster-dem と同じ)
+      rejected_because: 同じ視点で 4〜5 倍のバイト。復号にキャンバスを通すと指紋対策の雑音を受けるおそれもある
+    - option: DecompressionStream (deflate-raw) で圧縮した 16 bit
+      rejected_because: 7% 大きく、チャンクごとに非同期になる
+    - option: MED 予測、親からの差分、altpbf 流の SVarint+deflate
+      rejected_because: それぞれ 6.7% 大きい、5% 縮むが子が親に依存する、L2 で 6% 大きい
+    - option: TIN や quantized-mesh
+      rejected_because: 比べていない
+    - option: CDLOD と geomorph
+      rejected_because: ortho-earth は勧めていない。ポップは 1〜3 px の見込みで、目視の確認が残る
+    - option: LOD なしで全部 L0
+      rejected_because: GPU は 4.5 ms で収まるが (lod-ceiling)、最初に 7.8 MB を読むことになる
+    - option: L1 と L2 を全部先読み (設計時の案)
+      rejected_because: 回転で要る L0 が抜けて 3 フレームが代替描画になった。回転の和集合の先読みにした (orbit-prefetch)
+    - option: 範囲の結合 32 KiB (設計時の案)
+      rejected_because: 8 KiB より 17 ms 遅く 14% 多い (range-gap)
+  not_doing: [画像の貼り付け, 文字, 水面, 建物, 地球儀, 影を落とすこと, 等高線, 高さの読み出し UI, タッチ, geomorph, 区画の外への移動, 実行時の WebP の復号]
+
+verification:
+  checks:
+    - id: sky-and-terrain
+      what: default 視点で、上に空、下に地形が出ている
+      how: 画面を読み戻し、上端 3% の行と下端 40% の行で空の色 (クリア色 ±2) の画素を数える
+      expected: 上端の 95% 以上が空、下端 40% の空の画素は 0
+    - id: no-holes
+      what: LOD の段差の割れ、スカートの抜け、チャンクの欠けがない
+      how: >-
+        検査用のフレームだけクリア色をマゼンタにして読み戻し、各列で最初と最後の地形画素の間にあるマゼンタ画素を数える
+        (区画の外は数えない)。default、close、low、回転中の 12 地点、zoom-cold の読み込み後
+      expected: すべて 0
+    - id: summit-close
+      what: close 視点で、山頂が白く、L0 で、正しい高さで描かれている
+      how: >-
+        truth の山頂 (DuckDB の arg_max) を曲率込みで投影した画素のまわり 5x5 で、位置ターゲット (MRT) の段と高さを読み、
+        高さ 3,400 m 以上の画素 (山頂の面。この視点では山頂が稜線の上にあり、3x3 のうち 6 画素は奥の標高 1,290 m の低地) の色から
+        gl.ts の霞 (画素の位置と目から同じ式で求める) を外して光の係数を 3 成分それぞれ出す。雪 (白) なら 3 成分が同じ係数になる。
+        陰の雪は灰色でも通り、岩の色 (0.45, 0.39, 0.38) や雪の色の段が抜けていれば落ちる
+      expected: >-
+        山頂の面の画素が 5 以上で、すべて 3 成分の係数の差が 0.02 以内、係数がシェーダーの 0.35 (環境光) から 1.2 の間。段はすべて L0、
+        5x5 の最大の高さが 3770.81 m の -5 m から +0.13 m (量子化の半分) の間。
+        (最初の版の「3x3 の各成分 200 以上」は、3x3 に奥の低地が入り、陰の雪も 92 まで暗くなるので成り立たない)
+    - id: heights-match-truth
+      what: 画面に出た地表の高さが、DuckDB で別に作った真値と一致する
+      how: >-
+        default、far、close、low、top で、truth の 124 地点を投影した画素の MRT から位置と段を読み、その位置の高さを
+        truth の段ごとの 4x4 近傍から、インデックスと同じ対角線の三角形で補間して比べる。スカートと、手前の別の面に
+        隠れた地点は除いて件数を報告する
+      expected: 各視点 20 地点以上を照合し、差はすべて 0.05 m 以内
+    - id: chunk-stats-match
+      what: 復号した全チャンクの値が DuckDB の真値と一致する
+      how: >-
+        ceiling の段階で 765 チャンクをすべて読み、復号のたびに 129x129 の量子化値の min、max、sum を取り、truth と比べる。
+        索引の hmin と hmax (目の高さの制限と視錐台の判定が読む値) も truth の min と max と比べる
+      expected: 765 チャンクすべて完全一致 (標本と索引の両方)
+    - id: light-direction
+      what: 太陽 (北西、高度 40°) に向いた斜面が明るい
+      how: >-
+        top 視点で、DuckDB が L2 の傾斜から選んだ北西向き 8 点と南東向き 8 点 (傾斜 20° 以上、標高 2000〜3000 m) の画素の明るさの平均を比べる
+      expected: 北西 − 南東 が 30 以上
+    - id: seam-shading
+      what: L0 のチャンクの境目で陰影に段差がない (縁の標本で法線を求めているため)
+      how: >-
+        close 視点で、MRT の位置から隣り合う画素の組がチャンクの境界 (L0 px 128j + 0.5) をまたぐものと、2 セル内側の線をまたぐもの (対照)
+        を集め、明るさの差の絶対値の平均を比べる
+      expected: 比が 1.3 以下 (境界の組は 100 以上)
+    - id: deepest-level-close
+      what: close 視点で最も細かい段まで降りている
+      how: 選択の結果を数える
+      expected: L0 が 50 チャンク以上、すべて読み込み済みで代替なし
+    - id: orig-decode-exact
+      what: 原本の WebP をブラウザで復号した値が、ベイク (GDAL の libwebp) と同じ
+      how: >-
+        close 視点で原本を読んだあと、z12 タイルのテクスチャを FBO に付けて readPixels し、truth の地点の Terrarium 値
+        (R*65536+G*256+B) を truth の L0 の生の値と比べる。色管理や乗算済みアルファによる破損を見つける
+      expected: 10 地点以上、すべて 0 差
+    - id: orig-vs-ours
+      what: 原本から描いた絵と自前の形式から描いた絵が同じ地形
+      how: >-
+        default 視点で両方の MRT を読み、同じ段のスカート以外の画素で高さの差を取る。あわせて原本の読み込みの実測バイト数を
+        ベイク時に実ファイルから数えた orig-costs.json と比べる
+      expected: 差の p99 が 0.6 m 以下、バイト数が一致
+    - id: idle-no-frames
+      what: 操作が止まったら描かない
+      how: 合成したドラッグを指を離す直前まで動かして慣性を起こし、止まって読み込みが落ち着いてから 500 ms の間の描画回数を数える
+      expected: 慣性が起き、そのあと 0 回
+    - id: camera-above-ground
+      what: 目が地面に潜らない
+      how: >-
+        pitch 8° で、目がちょうど山頂の上に来る注視点を選び、ホイールで最小距離 6 km まで寄る。目の高さと、その下の L0 チャンクの
+        最大標高を truth (DuckDB) から引いた差を見る。目を持ち上げる処理が読む索引の hmax とは別の値で比べる (索引は chunk-stats-match で照合)
+      expected: 距離 6 km、目の下のチャンクが山頂を含み、truth のチャンクの最大と truth の山頂 (3770.81 m) のどちらからも 149 m 以上
+    - id: orbit-no-wait
+      what: 先読みのあと、回しても粗い絵に戻らない
+      how: 回転の先読みのあと、orbit の 120 フレームで、選んだチャンクのうち未読のものがあったフレームを数える
+      expected: 0
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画ならエラーにする
