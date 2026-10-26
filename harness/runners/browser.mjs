@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { CDP } from '../lib/cdp.mjs';
@@ -21,7 +21,7 @@ const GPU_FLAGS = [
   '--disable-frame-rate-limit',
 ];
 
-export async function launchChrome() {
+export async function launchChrome(logFile) {
   const userDir = mkdtempSync(join(tmpdir(), 'mfs-chrome-'));
   const flags = process.env.MFS_CHROME_FLAGS ? process.env.MFS_CHROME_FLAGS.split(/\s+/) : GPU_FLAGS;
   const proc = spawn(process.env.CHROME_BIN ?? 'chromium', [
@@ -39,6 +39,7 @@ export async function launchChrome() {
     const timer = setTimeout(() => reject(new Error(`chromium did not start:\n${buf}`)), 30000);
     proc.stderr.on('data', (d) => {
       buf += d;
+      if (logFile) appendFileSync(logFile, d);
       const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
       if (m) { clearTimeout(timer); resolve(m[1]); }
     });
@@ -139,11 +140,19 @@ async function runOnce(chrome, url, spec, outDir, i, collector, screenshot) {
 export async function benchBrowser(root, spec, outDir, { iterations }) {
   const server = await serve(root);
   const url = `http://127.0.0.1:${server.address().port}/${spec.run.page}?bench=1`;
-  const chrome = await launchChrome();
+  const logFile = join(outDir, 'chrome.log');
+  writeFileSync(logFile, '');
+  const chrome = await launchChrome(logFile);
   const collector = new Collector();
   try {
     const { product } = await chrome.cdp.send('Browser.getVersion');
     collector.add({ info: { browser: product } });
+    const warm = new Collector();
+    const warmSpec = { run: { viewport: { width: 64, height: 64, deviceScaleFactor: 1, mobile: false }, cpuThrottle: 1 }, timeoutMs: 30000 };
+    const base = url.slice(0, url.indexOf('/', 'http://'.length));
+    await runOnce(chrome, `${base}/harness/probe/warmup.html`, warmSpec, outDir, -1, warm, false);
+    collector.add({ info: warm.info });
+    for (const e of warm.errors) collector.add({ error: `warm-up: ${e}` });
     for (let i = 0; i < iterations; i++) {
       await runOnce(chrome, url, spec, outDir, i, collector, i === iterations - 1);
     }

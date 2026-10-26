@@ -14,6 +14,7 @@ test('footprint sums raw and gzip bytes of shipped code and data', () => {
   assert.equal(m.code_bytes, 1500);
   assert.ok(m.code_gzip_bytes > 0 && m.code_gzip_bytes < 200);
   assert.equal(m.data_bytes, 2048);
+  assert.ok(m.data_gzip_bytes > 0 && m.data_gzip_bytes < 100);
 });
 
 test('a listed file that does not exist is an error, not zero bytes', () => {

@@ -4,7 +4,8 @@ import { gzipSync } from 'node:zlib';
 
 // What the renderer costs to ship: the code a user downloads (or the binary
 // that gets installed) and the data it loads. spec.footprint lists the files,
-// relative to the repository root.
+// relative to the repository root. Gzip sizes are per file, as a server would
+// send them.
 export function measureFootprint(root, { code = [], data = [] }) {
   const read = (f) => {
     try {
@@ -13,12 +14,14 @@ export function measureFootprint(root, { code = [], data = [] }) {
       throw new Error(`footprint file not found: ${f} (build/bake first?)`);
     }
   };
+  const gz = (bufs) => bufs.reduce((a, b) => a + gzipSync(b, { level: 9 }).length, 0);
   const codeBufs = code.map(read);
-  const all = Buffer.concat(codeBufs);
+  const dataBufs = data.map(read);
   return {
-    code_bytes: all.length,
-    code_gzip_bytes: code.length ? gzipSync(all, { level: 9 }).length : 0,
-    data_bytes: data.map(read).reduce((a, b) => a + b.length, 0),
+    code_bytes: codeBufs.reduce((a, b) => a + b.length, 0),
+    code_gzip_bytes: gz(codeBufs),
+    data_bytes: dataBufs.reduce((a, b) => a + b.length, 0),
+    data_gzip_bytes: gz(dataBufs),
   };
 }
 

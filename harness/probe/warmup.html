@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8">
+<script type="module">
+// Headless Chromium drops its first GPU process shortly after launch, taking
+// every context created before that with it. The harness opens this page
+// first and measures nothing until a WebGL context survives one second.
+const emit = (o) => (window.__mfsEmit ? window.__mfsEmit(JSON.stringify(o)) : console.log(o));
+let ok = false;
+for (let attempt = 1; attempt <= 10 && !ok; attempt++) {
+  const gl = document.createElement('canvas').getContext('webgl2');
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  await new Promise((r) => setTimeout(r, 1000));
+  if (!gl.isContextLost()) {
+    ok = true;
+    emit({ info: { warmup_attempts: attempt } });
+  }
+}
+emit(ok ? { done: true } : { error: 'no WebGL context survived warm-up' });
+</script>

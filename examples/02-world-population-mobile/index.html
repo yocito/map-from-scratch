@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>世界の人口</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #d9e8f2; font: 15px/1.5 system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #info { position: fixed; left: 12px; right: 12px; bottom: 12px; padding: 10px 14px; background: #fffe; border-radius: 10px;
+          box-shadow: 0 2px 8px #0003; color: #222; }
+  #info:empty { display: none; }
+</style>
+<canvas id="map"></canvas>
+<div id="info"></div>
+<script type="module">
+import { mount } from './map.js';
+const info = document.getElementById('info');
+const map = await mount(document.getElementById('map'), '../../data/baked/02-world-population-mobile', (c) => {
+  info.textContent = c ? `${c.name}  人口 ${c.population.toLocaleString('ja-JP')} 人` : '';
+});
+
+if (new URLSearchParams(location.search).has('bench')) {
+  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.js');
+  const { equalEarth } = await import('../../tools/geo.mjs');
+  const { gl, cam } = map;
+  gl.canvas.addEventListener('webglcontextlost', () => emit({ error: 'webgl context lost' }));
+  map.draw();
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+  emit({ metric: 'first_frame_ms', value: performance.now() });
+  emit({ info: { gpu: glRenderer(gl), vertices: map.vertices, triangles: map.triangles } });
+
+  // World coordinates (0..1) of a lon/lat, the same mapping as the bake.
+  const world = (lon, lat) => {
+    const [x, y] = equalEarth([lon, lat]);
+    return [(x + 2.7066) / (2 * 2.7066), (1.3174 - y) / (2 * 1.3174)];
+  };
+
+  // Pinch-zoom from the whole world into Japan and back out.
+  const [jx, jy] = world(138, 37);
+  const path = zoomPath(300, { cx: jx, cy: jy, z0: 1, z1: 32, pan: 0.002 });
+  await benchFrames(gl, path.length, (i) => {
+    cam.x = path[i].cx; cam.y = path[i].cy; cam.zoom = path[i].zoom;
+    map.draw();
+  });
+
+  // Taps: each is a 1-pixel id render plus a 1-pixel read back.
+  cam.x = 0.5; cam.y = 0.5; cam.zoom = 1;
+  map.draw();
+  const tap = [];
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 200; i++) {
+    const t0 = performance.now();
+    map.pick(rnd() * gl.canvas.width, rnd() * gl.canvas.height);
+    tap.push(performance.now() - t0);
+  }
+  emit({ metric: 'pick_ms', values: tap });
+
+  // Functional checks: what is under these places must be these countries.
+  const where = [[139.7, 35.7, 'JPN'], [2.35, 48.86, 'FRA'], [-47.9, -15.8, 'BRA'], [-150, 0, null]];
+  for (const [lon, lat, want] of where) {
+    const [x, y] = world(lon, lat);
+    const sx = (x - cam.x) * cam.zoom * gl.canvas.width + gl.canvas.width / 2;
+    const sy = (y - cam.y) * cam.zoom * gl.canvas.width * (1.3174 / 2.7066) + gl.canvas.height / 2;
+    const id = map.pick(sx, sy);
+    const got = id < 0 ? null : map.countries[id][0];
+    if (got !== want) emit({ error: `pick at ${lon},${lat}: got ${got}, want ${want}` });
+  }
+  // Leave Japan selected and in view for the screenshot.
+  cam.x = jx; cam.y = jy; cam.zoom = 6;
+  map.select(map.countries.findIndex((c) => c[0] === 'JPN'));
+  map.draw();
+  emit({ done: true });
+}
+</script>

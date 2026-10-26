@@ -1,0 +1,23 @@
+{
+  "id": "02-world-population-mobile",
+  "request": "スマホで、世界の国を人口で塗り分けた地図をピンチで拡大して、タップした国の名前と人口を出したい。",
+  "runtime": "browser",
+  "bake": ["node", "examples/02-world-population-mobile/bake.mjs"],
+  "run": {
+    "page": "examples/02-world-population-mobile/index.html",
+    "viewport": { "width": 390, "height": 844, "deviceScaleFactor": 3, "mobile": true },
+    "cpuThrottle": 4
+  },
+  "iterations": 5,
+  "footprint": {
+    "code": ["examples/02-world-population-mobile/map.js"],
+    "data": ["data/baked/02-world-population-mobile/world.bin", "data/baked/02-world-population-mobile/countries.json"]
+  },
+  "budgets": {
+    "code_gzip_bytes": { "max": 4000 },
+    "data_gzip_bytes": { "max": 600000 },
+    "first_frame_ms": { "stat": "p50", "max": 1500 },
+    "frame_ms": { "stat": "p95", "max": 16.7 },
+    "pick_ms": { "stat": "p95", "max": 8 }
+  }
+}

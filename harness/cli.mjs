@@ -124,7 +124,8 @@ async function main(argv) {
       return new Promise(() => {});
     }
     case 'probe': {
-      const spec = { run: { page: 'harness/probe/index.html', viewport: { width: 64, height: 64, deviceScaleFactor: 1, mobile: false }, cpuThrottle: 1 }, timeoutMs: 30000 };
+      const page = arg === 'lifetime' ? 'harness/probe/lifetime.html' : 'harness/probe/index.html';
+      const spec = { run: { page, viewport: { width: 64, height: 64, deviceScaleFactor: 1, mobile: false }, cpuThrottle: 1 }, timeoutMs: 30000 };
       const outDir = join(root, 'results', '_probe');
       mkdirSync(outDir, { recursive: true });
       const r = await benchBrowser(root, spec, outDir, { iterations: 1 });
