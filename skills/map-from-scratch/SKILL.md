@@ -76,8 +76,8 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    `bake.mjs`, the renderer, and for browser examples `index.html` plus a
    `bench.js` loaded only under `?bench` (07 does this; earlier examples keep
    the bench in `index.html`). Count in `chosen.code` exactly what a user
-   downloads. Shared bake helpers are in `tools/` (`sources.mjs` for raw data,
-   converted again when its settings change; `geo.mjs` for projections,
+   downloads. Shared bake helpers are in `tools/` (`sources.ts` for raw data,
+   converted again when its settings change; `geo.ts` for projections,
    simplification, triangulation, clipping); add to them with tests.
 5. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)
    and look at them: an outlier bounding box or a 10x larger file than
@@ -89,7 +89,7 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    one pending rAF) is easiest to copy from 02 or 07.
 7. **Write the bench**: first frame (say exactly when it starts and stops in
    `benchmarks.scenarios`; do not count loading the bench code), a camera
-   path (`zoomPath` and `benchFrames` in `harness/page/bench.js`, or the C
+   path (`zoomPath` and `benchFrames` in `harness/page/bench.ts`, or the C
    equivalent), fixed views for the cheap and expensive ends
    (`benchFrames(gl, n, draw, {prefix: 'whole_'})` reports `whole_frame_ms`),
    interaction costs, and every check of `verification.checks` as
@@ -110,7 +110,7 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
 ## Harness reference
 
 - `bin/mfs image | test | list | bake <id> | build <id> | bench <id|all> [-n N] | report | serve [port] | probe [lifetime]`
-- `spec.yaml` (references/spec-yaml.md) is read by `harness/lib/spec.mjs`;
+- `spec.yaml` (references/spec-yaml.md) is read by `harness/lib/spec.ts`;
   the harness takes runtime, page or command, viewport, throttle, iterations,
   bake and build commands, shipped files, budgets and check ids from it.
 - Renderers report with one JSON object per line prefixed `@mfs `

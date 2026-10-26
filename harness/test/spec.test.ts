@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSpec } from '../lib/spec.mjs';
+import { validateSpec } from '../lib/spec.ts';
 
-const browser = {
+// Loose on purpose: the tests break specs to see them refused.
+const browser: Record<string, any> = {
   id: '01-x',
   request: 'X をしたいから地図作って',
   runtime: 'browser',

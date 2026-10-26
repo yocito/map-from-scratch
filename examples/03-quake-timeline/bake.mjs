@@ -6,8 +6,8 @@
 //               u8 magnitude*10-40, u8 depth/3 km, u16 pad
 //   quakes.json [[time ms, mag, place], ...] same order, for the info line
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { source } from '../../tools/sources.mjs';
-import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/03-quake-timeline';
 const X = 2.7066, Y = 1.3174;

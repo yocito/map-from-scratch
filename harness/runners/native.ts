@@ -1,11 +1,12 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, statSync, existsSync, writeFileSync, rmSync } from 'node:fs';
-import { ppmToPng } from '../lib/png.mjs';
+import { ppmToPng } from '../lib/png.ts';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { Collector, parseLine } from '../lib/protocol.mjs';
+import { Collector, parseLine } from '../lib/protocol.ts';
+import type { RawResult, Spec } from '../lib/types.ts';
 
-function ensureExec(root) {
+function ensureExec(root: string): string {
   const src = join(root, 'harness/native/mfs-exec.c');
   const bin = join(root, '.cache/mfs-exec');
   if (!existsSync(bin) || statSync(bin).mtimeMs < statSync(src).mtimeMs) {
@@ -15,11 +16,11 @@ function ensureExec(root) {
   return bin;
 }
 
-function runOnce(root, spec, outDir, i, collector) {
+function runOnce(root: string, spec: Spec, outDir: string, i: number, collector: Collector): Promise<void> {
   const exec = ensureExec(root);
   const resultFile = join(outDir, `exec-${i}.json`);
-  return new Promise((resolve, reject) => {
-    const child = spawn(exec, [resultFile, '--', ...spec.run.cmd], {
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(exec, [resultFile, '--', ...spec.run.cmd!], {
       cwd: root,
       env: { ...process.env, MFS_OUT: outDir, MFS_ITERATION: String(i) },
       stdio: ['ignore', 'pipe', 'inherit'],
@@ -44,7 +45,7 @@ function runOnce(root, spec, outDir, i, collector) {
   });
 }
 
-export async function benchNative(root, spec, outDir, { iterations }) {
+export async function benchNative(root: string, spec: Spec, outDir: string, { iterations }: { iterations: number }): Promise<RawResult> {
   const collector = new Collector();
   for (let i = 0; i < iterations; i++) await runOnce(root, spec, outDir, i, collector);
   const ppm = join(outDir, 'screenshot.ppm');

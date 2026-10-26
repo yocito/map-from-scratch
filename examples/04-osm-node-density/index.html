@@ -15,7 +15,7 @@ import { mount } from './density.js';
 const map = await mount(document.getElementById('map'), '../../data/baked/04-osm-node-density/nodes.bin');
 
 if (new URLSearchParams(location.search).has('bench')) {
-  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.js');
+  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.ts');
   const { gl, cam } = map;
   gl.canvas.addEventListener('webglcontextlost', () => emit({ error: 'webgl context lost' }));
   map.draw();

@@ -12,34 +12,50 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
-import { loadSpec } from './lib/spec.mjs';
-import { summarize } from './lib/stats.mjs';
-import { checkBudgets, checkVerification } from './lib/budget.mjs';
-import { serve } from './lib/serve.mjs';
-import { measureFootprint, measureElf, checkDependencies, isSoftwareGpu } from './lib/footprint.mjs';
-import { benchNative } from './runners/native.mjs';
-import { benchBrowser } from './runners/browser.mjs';
+import { loadSpec } from './lib/spec.ts';
+import { summarize } from './lib/stats.ts';
+import { checkBudgets, checkVerification } from './lib/budget.ts';
+import { serve } from './lib/serve.ts';
+import { measureFootprint, measureElf, checkDependencies, isSoftwareGpu } from './lib/footprint.ts';
+import { benchNative } from './runners/native.ts';
+import { benchBrowser } from './runners/browser.ts';
+import type { Summary } from './lib/types.ts';
+import type { BudgetRow, CheckRow } from './lib/budget.ts';
+
+// results/<id>/latest.json
+interface StoredResult {
+  summaries: Record<string, Summary>;
+  budgets: BudgetRow[];
+  checks?: CheckRow[];
+  errors: string[];
+  env: Record<string, unknown>;
+}
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Examples are the purpose-built renderers; baselines are the same requests
 // done with a general-purpose engine, kept only to measure against.
 const SPEC_DIRS = ['examples', 'baselines'];
-const dirOf = new Map();
-function allIds() {
+const dirOf = new Map<string, string>();
+function allIds(): string[] {
   dirOf.clear();
   for (const d of SPEC_DIRS) {
     const base = join(root, d);
     if (!existsSync(base)) continue;
     for (const id of readdirSync(base)) {
-      if (['spec.yaml', 'spec.json'].some((f) => existsSync(join(base, id, f)))) dirOf.set(id, join(base, id));
+      if (existsSync(join(base, id, 'spec.yaml'))) dirOf.set(id, join(base, id));
     }
   }
   return [...dirOf.keys()].sort();
 }
-const specDir = (id) => (dirOf.size ? dirOf : (allIds(), dirOf)).get(id);
+const specDir = (id: string): string => {
+  if (!dirOf.size) allIds();
+  const d = dirOf.get(id);
+  if (!d) throw new Error(`unknown example ${id}`);
+  return d;
+};
 
-function select(arg) {
+function select(arg: string | undefined): string[] {
   if (!arg) throw new Error('example id (or "all") required');
   if (arg === 'all') return allIds();
   const hit = allIds().filter((id) => id === arg || id.startsWith(`${arg}-`));
@@ -47,11 +63,11 @@ function select(arg) {
   return hit;
 }
 
-function runStep(id, key) {
-  const spec = loadSpec(specDir(id));
-  if (!spec[key]) return;
-  console.log(`[${id}] ${key}: ${spec[key].join(' ')}`);
-  const r = spawnSync(spec[key][0], spec[key].slice(1), { cwd: root, stdio: 'inherit' });
+function runStep(id: string, key: 'bake' | 'build'): void {
+  const argv = loadSpec(specDir(id))[key];
+  if (!argv) return;
+  console.log(`[${id}] ${key}: ${argv.join(' ')}`);
+  const r = spawnSync(argv[0], argv.slice(1), { cwd: root, stdio: 'inherit' });
   if (r.status !== 0) throw new Error(`[${id}] ${key} failed (exit ${r.status})`);
 }
 
@@ -63,13 +79,13 @@ function gitRev() {
   }
 }
 
-function fmt(x) {
+function fmt(x: number | null | undefined): string {
   if (x === null || x === undefined) return '-';
   if (Math.abs(x) >= 1e6) return x.toExponential(2);
   return Number(x.toPrecision(4)).toString();
 }
 
-async function bench(id, iterations) {
+async function bench(id: string, iterations: number | undefined): Promise<boolean> {
   const spec = loadSpec(specDir(id));
   const outDir = join(root, 'results', id);
   mkdirSync(outDir, { recursive: true });
@@ -119,7 +135,7 @@ async function bench(id, iterations) {
   return raw.errors.length === 0 && budgets.every((b) => b.pass) && checks.every((c) => c.pass);
 }
 
-async function main(argv) {
+async function main(argv: string[]): Promise<number> {
   const [cmd, arg, ...rest] = argv;
   const nIdx = rest.indexOf('-n');
   const iterations = nIdx >= 0 ? Number(rest[nIdx + 1]) : undefined;
@@ -137,15 +153,15 @@ async function main(argv) {
       return ok ? 0 : 1;
     }
     case 'report': {
-      const kb = (b) => (b === undefined ? '-' : b < 10240 ? `${b} B` : `${(b / 1024).toFixed(0)} KB`);
-      const ms = (v) => (v === undefined || v === null ? '-' : `${Number(v.toPrecision(3))} ms`);
+      const kb = (b: number | null | undefined) => (b == null ? '-' : b < 10240 ? `${b} B` : `${(b / 1024).toFixed(0)} KB`);
+      const ms = (v: number | null | undefined) => (v == null ? '-' : `${Number(v.toPrecision(3))} ms`);
       console.log('| 例 | 実行環境 | 配るコード | データ | 初回描画 p50 | フレーム p95 | 予算 |');
       console.log('| --- | --- | --- | --- | --- | --- | --- |');
       for (const id of allIds()) {
         const f = join(root, 'results', id, 'latest.json');
         if (!existsSync(f)) { console.log(`| ${id} | 未計測 | | | | | |`); continue; }
-        const r = JSON.parse(readFileSync(f, 'utf8'));
-        const s = (k, st = 'p50') => r.summaries[k]?.[st];
+        const r = JSON.parse(readFileSync(f, 'utf8')) as StoredResult;
+        const s = (k: string, st: 'p50' | 'p95' = 'p50') => r.summaries[k]?.[st];
         const spec = loadSpec(specDir(id));
         const api = spec.definition?.architecture_selection?.chosen?.api?.split(/[(。]/)[0].trim();
         const env = api && api !== 'なし' ? api
@@ -174,9 +190,20 @@ async function main(argv) {
       return r.errors.length ? 1 : 0;
     }
     case 'test': {
+      // Unit tests, then type checks of the Node side and the browser side.
       const tests = ['harness/test', 'tools/test'].flatMap((d) =>
-        readdirSync(join(root, d)).filter((f) => f.endsWith('.test.mjs')).map((f) => join(root, d, f)));
-      return spawnSync(process.execPath, ['--test', ...tests], { stdio: 'inherit' }).status;
+        readdirSync(join(root, d)).filter((f) => f.endsWith('.test.ts')).map((f) => join(root, d, f)));
+      const steps: [string, string[]][] = [
+        [process.execPath, ['--test', ...tests]],
+        ['tsc', ['-p', 'tsconfig.node.json']],
+        ['tsc', ['-p', 'tsconfig.web.json']],
+      ];
+      for (const [cmd, args] of steps) {
+        const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit' });
+        if (r.status !== 0) { console.error(`failed: ${cmd} ${args.slice(0, 2).join(' ')}`); return r.status ?? 1; }
+        if (cmd === 'tsc') console.log(`tsc ${args[1]}: ok`);
+      }
+      return 0;
     }
     default:
       console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 9).join('\n'));

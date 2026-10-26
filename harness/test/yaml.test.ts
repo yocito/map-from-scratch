@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseYaml } from '../lib/yaml.mjs';
+import { parseYaml } from '../lib/yaml.ts';
 
 test('scalars: strings, numbers, booleans, null', () => {
   assert.deepEqual(parseYaml('a: hello\nb: 12\nc: 1.5\nd: -3\ne: true\nf: false\ng: null\nh: ~\ni:\n'), {

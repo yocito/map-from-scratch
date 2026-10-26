@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { measureFootprint, checkDependencies, isSoftwareGpu } from '../lib/footprint.mjs';
+import { measureFootprint, checkDependencies, isSoftwareGpu } from '../lib/footprint.ts';
 
 test('footprint sums raw and gzip bytes of shipped code and data', () => {
   const d = mkdtempSync(join(tmpdir(), 'fp-'));
@@ -37,7 +37,7 @@ test('software rasterisers are recognised', () => {
 });
 
 test('parseSizeA sums sections by kind from llvm-size -A output', async () => {
-  const { parseSizeA } = await import('../lib/footprint.mjs');
+  const { parseSizeA } = await import('../lib/footprint.ts');
   const out = `mcumap.o  :
 section             size   addr
 .text                 12      0

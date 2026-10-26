@@ -16,8 +16,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { source } from '../../tools/sources.mjs';
-import { equalEarth, simplify, polygonsOf } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { equalEarth, simplify, polygonsOf } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/07-world-cities-hover';
 const X = 2.7066, Y = 1.3174;

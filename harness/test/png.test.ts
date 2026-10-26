@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inflateSync } from 'node:zlib';
-import { ppmToPng, parsePpm } from '../lib/png.mjs';
+import { ppmToPng, parsePpm } from '../lib/png.ts';
 
 const ppm = Buffer.concat([Buffer.from('P6\n2 1\n255\n'), Buffer.from([255, 0, 0, 0, 0, 255])]);
 

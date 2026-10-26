@@ -2,9 +2,9 @@ import { deflateSync, crc32 } from 'node:zlib';
 
 // Native renderers write the easiest image there is (binary PPM); the
 // harness turns it into a PNG so every example's screenshot looks the same.
-export function parsePpm(buf) {
+export function parsePpm(buf: Buffer): { width: number; height: number; rgb: Buffer } {
   if (buf.toString('ascii', 0, 2) !== 'P6') throw new Error('not a binary P6 PPM');
-  const fields = [];
+  const fields: number[] = [];
   let i = 2;
   while (fields.length < 3) {
     while (/\s/.test(String.fromCharCode(buf[i]))) i++;
@@ -18,7 +18,7 @@ export function parsePpm(buf) {
   return { width, height, rgb: buf.subarray(i + 1, i + 1 + width * height * 3) };
 }
 
-function chunk(type, data) {
+function chunk(type: string, data: Buffer): Buffer {
   const len = Buffer.alloc(4);
   len.writeUInt32BE(data.length);
   const td = Buffer.concat([Buffer.from(type, 'ascii'), data]);
@@ -27,7 +27,7 @@ function chunk(type, data) {
   return Buffer.concat([len, td, crc]);
 }
 
-export function ppmToPng(buf) {
+export function ppmToPng(buf: Buffer): Buffer {
   const { width, height, rgb } = parsePpm(buf);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);

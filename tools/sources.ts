@@ -10,7 +10,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const rawDir = join(root, 'data/raw');
 const NE = '/sata_hdd_24tb/hf_data/__published/ne-admin0-10m/v5.1.1/shapefile';
 
-const SOURCES = {
+interface Source { out: string; local: string; remote?: string; ogr?: string[]; copy?: boolean }
+
+const SOURCES: Record<string, Source> = {
   // Natural Earth 10m admin 0, v5.1.1. Public domain.
   'ne-countries': {
     out: 'ne_10m_admin_0_countries.geojson',
@@ -48,7 +50,7 @@ const SOURCES = {
   },
 };
 
-export function source(name) {
+export function source(name: string): string {
   const s = SOURCES[name];
   if (!s) throw new Error(`unknown source ${name}`);
   const out = join(rawDir, s.out);

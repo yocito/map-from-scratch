@@ -3,7 +3,7 @@
 # nvidia container runtime for GPU examples).
 #
 #   bin/mfs image              (re)build the base image
-#   bin/mfs <harness command>  see harness/cli.mjs
+#   bin/mfs <harness command>  see harness/cli.ts
 #
 # Environment:
 #   MFS_IMAGE    image to run          (default mfs-base:latest)
@@ -36,4 +36,4 @@ SOURCES=${MFS_SOURCES-/sata_hdd_24tb}
 [[ -n "${MFS_CHROME_FLAGS:-}" ]] && args+=(-e "MFS_CHROME_FLAGS=$MFS_CHROME_FLAGS")
 [[ -n "${DISPLAY:-}" && -d /tmp/.X11-unix ]] && args+=(-e "DISPLAY=$DISPLAY" -v /tmp/.X11-unix:/tmp/.X11-unix)
 
-exec docker run "${args[@]}" "$IMAGE" node harness/cli.mjs "$@"
+exec docker run "${args[@]}" "$IMAGE" node harness/cli.ts "$@"

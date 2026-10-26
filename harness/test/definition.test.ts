@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDefinition, fromDefinition } from '../lib/spec.mjs';
+import { validateDefinition, fromDefinition } from '../lib/spec.ts';
 
-const def = () => ({
+// Loose on purpose: the tests break definitions to see them refused.
+const def = (): any => ({
   id: '01-x',
   request: 'X をしたいから地図作って',
   requirements: [

@@ -1,10 +1,10 @@
 # spec.yaml: the definition of an example
 
 Every example (and baseline) is defined by one `spec.yaml` with seven
-sections. The harness reads it (`harness/lib/spec.mjs`), refuses an
+sections. The harness reads it (`harness/lib/spec.ts`), refuses an
 incomplete one, and takes its run settings from it, so the definition and
 what is measured cannot drift apart. The YAML subset the harness parses is in
-`harness/lib/yaml.mjs` (block maps and lists, flow `[...]` `{...}`, quoted
+`harness/lib/yaml.ts` (block maps and lists, flow `[...]` `{...}`, quoted
 strings, `>` and `|` blocks, comments; no anchors or tags).
 
 Write the text fields in the language of the request. Copy the closest
@@ -88,11 +88,11 @@ Where the data comes from and what the renderer receives.
 | field | |
 | --- | --- |
 | `bake` | argv run by `bin/mfs bake <id>` |
-| `sources` | list of `{id, origin, license}`; `id` names an entry of `tools/sources.mjs` |
+| `sources` | list of `{id, origin, license}`; `id` names an entry of `tools/sources.ts` |
 | `outputs` | baked files the renderer loads; they are the footprint's data |
 | `preparation` | the bake steps in words: projection, simplification, quantisation, ordering, encoding |
 
-Raw sources live in `tools/sources.mjs` (converted once to `data/raw/`,
+Raw sources live in `tools/sources.ts` (converted once to `data/raw/`,
 again when their settings change). Processing specific to one example
 (dissolving countries, clipping) belongs in its `bake.mjs`.
 

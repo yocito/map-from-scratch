@@ -20,8 +20,8 @@ const map = await mount(document.getElementById('map'), '../../data/baked/02-wor
 });
 
 if (new URLSearchParams(location.search).has('bench')) {
-  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.js');
-  const { equalEarth } = await import('../../tools/geo.mjs');
+  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.ts');
+  const { equalEarth } = await import('../../tools/geo.ts');
   const { gl, cam } = map;
   gl.canvas.addEventListener('webglcontextlost', () => emit({ error: 'webgl context lost' }));
   map.draw();

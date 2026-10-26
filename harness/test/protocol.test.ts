@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Collector, parseLine } from '../lib/protocol.mjs';
+import { Collector, parseLine } from '../lib/protocol.ts';
 
 test('parseLine ignores ordinary output', () => {
   assert.equal(parseLine('hello'), null);

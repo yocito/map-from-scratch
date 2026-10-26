@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { summarize, percentile } from '../lib/stats.mjs';
+import { summarize, percentile } from '../lib/stats.ts';
 
 test('percentile uses nearest-rank on sorted copy', () => {
   const v = [5, 1, 4, 2, 3];

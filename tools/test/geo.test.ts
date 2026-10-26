@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { equalEarth, mercator, simplify, triangulatePolygon, polygonsOf } from '../geo.mjs';
+import { equalEarth, mercator, simplify, triangulatePolygon, polygonsOf } from '../geo.ts';
 
-const close = (a, b, eps = 1e-4) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
+const close = (a: number, b: number, eps = 1e-4) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
 
 test('equal earth: origin, equator edge, pole', () => {
   assert.deepEqual(equalEarth([0, 0]), [0, 0]);
@@ -45,8 +45,8 @@ test('polygonsOf flattens Polygon and MultiPolygon', () => {
 });
 
 test('clipPolyline keeps what is inside and splits where a line leaves and re-enters', async () => {
-  const { clipPolyline } = await import('../geo.mjs');
-  const box = [0, 0, 10, 10];
+  const { clipPolyline } = await import('../geo.ts');
+  const box: [number, number, number, number] = [0, 0, 10, 10];
   assert.deepEqual(clipPolyline([[1, 1], [5, 5]], box), [[[1, 1], [5, 5]]]);
   assert.deepEqual(clipPolyline([[-5, 5], [5, 5]], box), [[[0, 5], [5, 5]]]);
   assert.deepEqual(clipPolyline([[20, 20], [30, 30]], box), []);

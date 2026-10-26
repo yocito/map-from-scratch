@@ -1,0 +1,7 @@
+{
+  "name": "map-from-scratch",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "No dependencies. TypeScript and @types/node live only in the Docker image (docker/base/Dockerfile) for type checking."
+}

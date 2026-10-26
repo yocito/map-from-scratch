@@ -1,0 +1,33 @@
+export {};
+
+const emit = (o: object): void => ((window as any).__mfsEmit ? (window as any).__mfsEmit(JSON.stringify(o)) : console.log(o));
+const info: Record<string, unknown> = {};
+const gl = document.createElement('canvas').getContext('webgl2');
+if (gl) {
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  info.webgl2 = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  info.webgl2_timer_query = !!gl.getExtension('EXT_disjoint_timer_query_webgl2');
+} else {
+  info.webgl2 = null;
+}
+if (navigator.gpu) {
+  const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+  if (adapter) {
+    const i = adapter.info ?? {};
+    info.webgpu = `${i.vendor} ${i.architecture} ${i.device} ${i.description}`.trim();
+    info.webgpu_features = [...adapter.features].sort().join(',');
+  } else info.webgpu = 'no adapter';
+} else info.webgpu = 'navigator.gpu missing';
+// A context that is lost shortly after creation means the GPU process went
+// away; every number measured after that is meaningless.
+if (gl) {
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  await new Promise((r) => setTimeout(r, 2000));
+  info.webgl2_alive_after_2s = !gl.isContextLost();
+  const c2 = document.createElement('canvas').getContext('2d')!;
+  c2.fillRect(0, 0, 10, 10);
+  await new Promise((r) => setTimeout(r, 1000));
+  info.canvas2d_alive_after_1s = !c2.isContextLost();
+}
+emit({ info });
+emit({ done: true });

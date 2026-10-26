@@ -18,7 +18,7 @@ el.addEventListener('prefecture', (e) => {
 const map = await mount(el, '../../data/baked/01-prefecture-picker/prefectures.json');
 
 if (new URLSearchParams(location.search).has('bench')) {
-  const { emit } = await import('../../harness/page/bench.js');
+  const { emit } = await import('../../harness/page/bench.ts');
   el.querySelector('canvas').addEventListener('contextlost', () => emit({ error: 'canvas context lost' }));
   // First frame = the second rAF after mounting: the frame holding the map
   // has been produced.

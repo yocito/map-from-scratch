@@ -3,9 +3,12 @@
 // folded (>) and literal (|) block scalars, comments. No anchors, tags or
 // multi-document streams; anything outside the subset is an error.
 
+export type Yaml = null | boolean | number | string | Yaml[] | { [key: string]: Yaml };
+interface Line { indent: number; text: string; no: number }
+
 const NUMBER = /^[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?$/;
 
-function scalar(s) {
+function scalar(s: string): Yaml {
   if (s === '' || s === '~' || s === 'null') return null;
   if (s === 'true') return true;
   if (s === 'false') return false;
@@ -14,8 +17,8 @@ function scalar(s) {
 }
 
 // Strip a trailing comment: '#' at the start or after whitespace, outside quotes.
-function stripComment(text) {
-  let q = null;
+function stripComment(text: string): string {
+  let q: string | null = null;
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
     if (q) {
@@ -31,8 +34,8 @@ function stripComment(text) {
 }
 
 // Flow collections and quoted scalars, from position i of s.
-function parseFlow(s, i, stops, lineNo) {
-  const fail = (m) => { throw new Error(`yaml line ${lineNo}: ${m}`); };
+function parseFlow(s: string, i: number, stops: string, lineNo: number): [Yaml, number] {
+  const fail = (m: string): never => { throw new Error(`yaml line ${lineNo}: ${m}`); };
   const ws = () => { while (s[i] === ' ') i++; };
   ws();
   const c = s[i];
@@ -62,21 +65,21 @@ function parseFlow(s, i, stops, lineNo) {
   }
   if (c === '[' || c === '{') {
     const isMap = c === '{', close = isMap ? '}' : ']';
-    const out = isMap ? {} : [];
+    const out: Yaml = isMap ? {} : [];
     i++;
     ws();
     if (s[i] === close) return [out, i + 1];
     for (;;) {
-      let key;
+      let key: Yaml = null;
       if (isMap) {
         [key, i] = parseFlow(s, i, ':', lineNo);
         ws();
         if (s[i] !== ':') fail('expected ":" in flow mapping');
         i++;
       }
-      let v;
+      let v: Yaml;
       [v, i] = parseFlow(s, i, `,${close}`, lineNo);
-      if (isMap) out[key] = v; else out.push(v);
+      if (Array.isArray(out)) out.push(v); else (out as Record<string, Yaml>)[String(key)] = v;
       ws();
       if (s[i] === ',') { i++; ws(); continue; }
       if (s[i] === close) return [out, i + 1];
@@ -88,7 +91,7 @@ function parseFlow(s, i, stops, lineNo) {
   return [scalar(s.slice(start, i).trim()), i];
 }
 
-function inline(text, lineNo) {
+function inline(text: string, lineNo: number): Yaml {
   const t = text.trim();
   if (t[0] === '[' || t[0] === '{' || t[0] === '"' || t[0] === "'") {
     const [v, end] = parseFlow(t, 0, '', lineNo);
@@ -101,10 +104,10 @@ function inline(text, lineNo) {
 const KEY = /^("[^"]*"|'[^']*'|[^\s"'[\]{}#-][^:]*?|-[^\s:][^:]*?):(\s+|$)/;
 const ITEM = /^-(\s+|$)/;
 
-export function parseYaml(src) {
+export function parseYaml(src: string): Yaml {
   const raw = src.replace(/\r\n?/g, '\n').split('\n');
-  const lines = raw.map((r, n) => {
-    const m = r.match(/^( *)(\t*)/);
+  const lines: Line[] = raw.map((r, n) => {
+    const m = r.match(/^( *)(\t*)/)!;
     const text = stripComment(r.slice(m[1].length));
     if (m[2] && text) throw new Error(`yaml line ${n + 1}: tab in indentation`);
     return { indent: m[1].length, text, no: n + 1 };
@@ -112,14 +115,14 @@ export function parseYaml(src) {
   let i = 0;
   const skip = () => { while (i < lines.length && lines[i].text === '') i++; };
 
-  function block(indent) {
+  function block(indent: number): Yaml {
     skip();
     if (i >= lines.length) return null;
     return ITEM.test(lines[i].text) ? seq(lines[i].indent) : map(lines[i].indent);
   }
 
   // A value that starts on the line after "key:" or "-".
-  function nested(parentIndent, allowSeqAtSameIndent) {
+  function nested(parentIndent: number, allowSeqAtSameIndent: boolean): Yaml {
     skip();
     if (i >= lines.length) return null;
     const l = lines[i];
@@ -128,14 +131,14 @@ export function parseYaml(src) {
     return null;
   }
 
-  function blockScalar(header, parentIndent) {
+  function blockScalar(header: string, parentIndent: number): string {
     const literal = header[0] === '|', chomp = header.includes('-') ? 'strip' : 'clip';
-    const body = [];
-    let indent = null;
+    const body: string[] = [];
+    let indent: number | null = null;
     for (; i < lines.length; i++) {
       const r = raw[i];
       if (r.trim() === '') { body.push(''); continue; }
-      const ind = r.match(/^ */)[0].length;
+      const ind = r.match(/^ */)![0].length;
       if (ind <= parentIndent) break;
       if (indent === null) indent = ind;
       body.push(r.slice(indent));
@@ -153,14 +156,8 @@ export function parseYaml(src) {
     return chomp === 'strip' ? text : `${text}\n`;
   }
 
-  function value(rest, l, indent, isSeqItemKey) {
-    if (rest === '') return nested(indent, !isSeqItemKey);
-    if (/^[|>][-+]?$/.test(rest)) { i++; const v = blockScalar(rest, indent); i--; return v; }
-    return inline(rest, l.no);
-  }
-
-  function map(indent) {
-    const out = {};
+  function map(indent: number): Yaml {
+    const out: Record<string, Yaml> = {};
     for (skip(); i < lines.length; skip()) {
       const l = lines[i];
       if (l.indent < indent) break;
@@ -168,7 +165,7 @@ export function parseYaml(src) {
       if (ITEM.test(l.text)) break;
       const m = l.text.match(KEY);
       if (!m) throw new Error(`yaml line ${l.no}: expected "key: value"`);
-      const key = m[1][0] === '"' || m[1][0] === "'" ? inline(m[1], l.no) : m[1].trim();
+      const key = String(m[1][0] === '"' || m[1][0] === "'" ? inline(m[1], l.no) : m[1].trim());
       const rest = l.text.slice(m[0].length).trim();
       i++;
       if (rest === '') out[key] = nested(indent, true);
@@ -178,8 +175,8 @@ export function parseYaml(src) {
     return out;
   }
 
-  function seq(indent) {
-    const out = [];
+  function seq(indent: number): Yaml {
+    const out: Yaml[] = [];
     for (skip(); i < lines.length; skip()) {
       const l = lines[i];
       if (l.indent < indent) break;

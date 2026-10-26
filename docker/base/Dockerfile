@@ -17,4 +17,8 @@ RUN apt-get update \
       fonts-noto-cjk \
  && rm -rf /var/lib/apt/lists/*
 
+# Type checking only (bin/mfs test runs tsc --noEmit). Nothing here ships:
+# Node runs .ts directly and the static server strips types for browsers.
+RUN npm install -g --no-audit --no-fund typescript@6.0.3 @types/node@24.19.2
+
 ENV CHROME_BIN=/usr/bin/chromium

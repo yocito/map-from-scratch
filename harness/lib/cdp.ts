@@ -1,27 +1,35 @@
 // Minimal Chrome DevTools Protocol client over Node's built-in WebSocket.
 // Flat sessions only: every command may carry a sessionId.
+// CDP payloads are loosely typed on purpose: callers know which fields a
+// method returns.
+type Json = any;
+type Listener = (params: Json, sessionId?: string) => void;
+interface Pending { resolve: (v: Json) => void; reject: (e: Error) => void; method: string }
+
 export class CDP {
-  static connect(url) {
+  ws: WebSocket;
+  nextId = 1;
+  pending = new Map<number, Pending>();
+  listeners = new Map<string, Listener[]>();
+
+  static connect(url: string): Promise<CDP> {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(url);
       ws.addEventListener('open', () => resolve(new CDP(ws)), { once: true });
-      ws.addEventListener('error', (e) => reject(new Error(`CDP connect failed: ${e.message ?? url}`)), { once: true });
+      ws.addEventListener('error', () => reject(new Error(`CDP connect failed: ${url}`)), { once: true });
     });
   }
 
-  constructor(ws) {
+  constructor(ws: WebSocket) {
     this.ws = ws;
-    this.nextId = 1;
-    this.pending = new Map();
-    this.listeners = new Map();
-    ws.addEventListener('message', (e) => this.onMessage(JSON.parse(e.data)));
+    ws.addEventListener('message', (e) => this.onMessage(JSON.parse(String(e.data))));
     ws.addEventListener('close', () => {
       for (const { reject } of this.pending.values()) reject(new Error('CDP connection closed'));
       this.pending.clear();
     });
   }
 
-  onMessage(msg) {
+  onMessage(msg: Json): void {
     if (msg.id !== undefined) {
       const p = this.pending.get(msg.id);
       if (!p) return;
@@ -33,9 +41,9 @@ export class CDP {
     for (const fn of this.listeners.get(msg.method) ?? []) fn(msg.params, msg.sessionId);
   }
 
-  send(method, params = {}, sessionId) {
+  send(method: string, params: Json = {}, sessionId?: string): Promise<Json> {
     const id = this.nextId++;
-    const msg = { id, method, params };
+    const msg: Json = { id, method, params };
     if (sessionId) msg.sessionId = sessionId;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject, method });
@@ -43,16 +51,16 @@ export class CDP {
     });
   }
 
-  on(method, fn) {
+  on(method: string, fn: Listener): () => void {
     if (!this.listeners.has(method)) this.listeners.set(method, []);
-    this.listeners.get(method).push(fn);
+    this.listeners.get(method)!.push(fn);
     return () => {
-      const a = this.listeners.get(method);
+      const a = this.listeners.get(method) ?? [];
       a.splice(a.indexOf(fn), 1);
     };
   }
 
-  close() {
+  close(): void {
     this.ws.close();
   }
 }

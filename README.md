@@ -68,7 +68,7 @@ MapLibre は Web メルカトルで描くので、投影法は 02 (Equal Earth) 
 ref-repos/clone.sh     # 参照する地図エンジンを集める (浅いクローン、約 8 GB)
 bin/mfs image          # ベースイメージを作る
 bin/mfs test           # ハーネスとベイク用ヘルパのテスト
-bin/mfs bake all       # データを用意する (原データの場所は tools/sources.mjs)
+bin/mfs bake all       # データを用意する (原データの場所は tools/sources.ts)
 bin/mfs build all      # ネイティブの例をビルドする
 bin/mfs bench all      # 計測して予算と照合する。結果は results/<id>/
 bin/mfs report         # 最新の結果を Markdown の表で出す
@@ -79,7 +79,7 @@ bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:808
 
 ## ハーネス
 
-- `harness/cli.mjs`: 依存のない Node 24 の CLI。`bin/mfs` がコンテナの中で動かす。
+- `harness/cli.ts`: 依存のない TypeScript の CLI。Node 24 が型を除いてそのまま実行し、`bin/mfs` がコンテナの中で動かす。型検査 (tsc) は `bin/mfs test` で、イメージの中だけにある TypeScript で行う。
 - ブラウザの描画器: headless Chromium を自作の CDP クライアント (Node 組み込みの WebSocket を使う) で動かす。ページは `window.__mfsEmit` で計測値を返す。GPU の代わりに SwiftShader などのソフトウェア描画が使われていたら、エラーにする。
 - ネイティブの描画器: `harness/native/mfs-exec.c` が fork/exec して、出力の各行にプロセス起動からの時刻を付ける。wait4 で CPU 時間と最大常駐メモリを取る。
 - 配るものの大きさ: コードとデータのバイト数と gzip 後の大きさ。マイコン向けはオブジェクトの .text、.rodata、RAM (.data + .bss) を `llvm-size` で測る。

@@ -8,7 +8,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { source } from '../../tools/sources.mjs';
+import { source } from '../../tools/sources.ts';
 
 const OUT = 'data/baked/04-osm-node-density';
 const pbf = source('osm-tokyo23');

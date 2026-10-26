@@ -2,8 +2,8 @@
 // tolerance in the same projection (Equal Earth), but written back as the
 // original lon/lat of the points that were kept, as GeoJSON.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { source } from '../../tools/sources.mjs';
-import { equalEarth, simplify, polygonsOf } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { equalEarth, simplify, polygonsOf } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/b02-maplibre';
 const X = 2.7066;

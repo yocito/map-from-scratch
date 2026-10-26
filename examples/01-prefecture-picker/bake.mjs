@@ -2,8 +2,8 @@
 // The browser's own Path2D parser and isPointInPath then do all the work,
 // so the renderer ships no geometry code at all.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { source } from '../../tools/sources.mjs';
-import { simplify } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { simplify } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/01-prefecture-picker';
 const GRID = 1000;

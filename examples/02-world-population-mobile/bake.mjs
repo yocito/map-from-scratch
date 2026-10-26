@@ -13,8 +13,8 @@
 //                                  so no line indices are stored
 //   u32 tri[nTriIdx]               difference from the previous index, mod 2^32
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { source } from '../../tools/sources.mjs';
-import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/02-world-population-mobile';
 const X = 2.7066, Y = 1.3174;           // Equal Earth extent

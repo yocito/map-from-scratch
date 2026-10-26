@@ -1,54 +1,55 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
-import { parseYaml } from './yaml.mjs';
+import { parseYaml } from './yaml.ts';
+import type { Definition, Spec } from './types.ts';
 
 const RUNTIMES = ['browser', 'native'];
 const STATS = ['min', 'p50', 'p95', 'p99', 'max', 'mean'];
 
 // spec.yaml is the definition of an example: requirements, evaluation,
 // benchmarks, datasets, performance knowledge, architecture selection and
-// verification. The harness takes its run settings from it. spec.json (run
-// settings only) is still read for examples that have not moved over.
-export function loadSpec(dir) {
+// verification. The harness takes its run settings from it.
+export function loadSpec(dir: string): Spec {
   const yaml = join(dir, 'spec.yaml');
-  if (existsSync(yaml)) {
-    const def = parseYaml(readFileSync(yaml, 'utf8'));
-    validateDefinition(def, basename(dir));
-    return { ...validateSpec(fromDefinition(def), basename(dir)), definition: def };
-  }
-  const spec = JSON.parse(readFileSync(join(dir, 'spec.json'), 'utf8'));
-  return validateSpec(spec, basename(dir));
+  if (!existsSync(yaml)) throw new Error(`${basename(dir)}: spec.yaml not found`);
+  const def = validateDefinition(parseYaml(readFileSync(yaml, 'utf8')), basename(dir));
+  return { ...validateSpec(fromDefinition(def), basename(dir)), definition: def };
 }
 
 export const SECTIONS = ['requirements', 'evaluation', 'benchmarks', 'datasets', 'performance_knowledge', 'architecture_selection', 'verification'];
 
-export function validateDefinition(def, dirName) {
-  const fail = (msg) => { throw new Error(`${dirName}/spec.yaml: ${msg}`); };
+// Parsed YAML is checked field by field before it is trusted as a Definition.
+type Loose = Record<string, any>;
+
+export function validateDefinition(input: unknown, dirName: string): Definition {
+  const fail = (msg: string): never => { throw new Error(`${dirName}/spec.yaml: ${msg}`); };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) fail('not a mapping');
+  const def = input as Loose;
   for (const k of SECTIONS) if (def[k] === undefined || def[k] === null) fail(`section ${k} is required`);
   if (!Array.isArray(def.requirements)) fail('requirements must be a list');
   if (!Array.isArray(def.evaluation.budgets)) fail('evaluation.budgets must be a list');
   if (!Array.isArray(def.performance_knowledge)) fail('performance_knowledge must be a list');
   if (!Array.isArray(def.verification.checks)) fail('verification.checks must be a list');
   if (!def.architecture_selection.chosen) fail('architecture_selection.chosen is required');
-  const reqIds = new Set(def.requirements.map((r) => r.id));
-  for (const r of def.requirements) if (!r.id || !r.need) fail('every requirement needs id and need');
-  for (const b of def.evaluation.budgets) {
+  for (const r of def.requirements as Loose[]) if (!r.id || !r.need) fail('every requirement needs id and need');
+  const reqIds = new Set((def.requirements as Loose[]).map((r) => r.id));
+  for (const b of def.evaluation.budgets as Loose[]) {
     if (!b.metric) fail('every budget needs a metric');
     if (!reqIds.has(b.requirement)) fail(`budget ${b.metric} points at unknown requirement "${b.requirement}"`);
   }
-  for (const r of def.requirements) {
-    const measured = def.evaluation.budgets.some((b) => b.requirement === r.id);
+  for (const r of def.requirements as Loose[]) {
+    const measured = (def.evaluation.budgets as Loose[]).some((b) => b.requirement === r.id);
     if (!measured && !r.unmeasured) fail(`requirement ${r.id} has no budget and no "unmeasured" reason`);
   }
-  for (const c of def.verification.checks) {
+  for (const c of def.verification.checks as Loose[]) {
     if (!c.id || !c.what || !c.how || c.expected === undefined) fail(`check ${c.id ?? '?'} needs id, what, how and expected`);
   }
-  return def;
+  return def as Definition;
 }
 
-export function fromDefinition(def) {
+export function fromDefinition(def: Definition): Loose {
   const b = def.benchmarks, chosen = def.architecture_selection.chosen;
-  const run = b.runtime === 'browser'
+  const run: Loose = b.runtime === 'browser'
     ? {
       page: b.page,
       viewport: b.viewport && {
@@ -77,8 +78,9 @@ export function fromDefinition(def) {
   };
 }
 
-export function validateSpec(spec, dirName) {
-  const fail = (msg) => { throw new Error(`${dirName}/spec.json: ${msg}`); };
+// Run settings (see fromDefinition), with defaults filled in.
+export function validateSpec(spec: Loose, dirName: string): Spec {
+  const fail = (msg: string): never => { throw new Error(`${dirName}/spec.yaml: ${msg}`); };
   if (spec.id !== dirName) fail(`id "${spec.id}" must equal the directory name`);
   if (typeof spec.request !== 'string' || !spec.request) fail('request (the fictional instruction) is required');
   if (!RUNTIMES.includes(spec.runtime)) fail(`runtime must be one of ${RUNTIMES.join(', ')}`);
@@ -103,9 +105,9 @@ export function validateSpec(spec, dirName) {
   spec.iterations ??= 5;
   spec.timeoutMs ??= 120000;
   spec.budgets ??= {};
-  for (const [name, b] of Object.entries(spec.budgets)) {
+  for (const [name, b] of Object.entries(spec.budgets as Record<string, Loose>)) {
     if (b.max == null && b.min == null) fail(`budget ${name} needs max or min`);
     if (b.stat !== undefined && !STATS.includes(b.stat)) fail(`budget ${name}: stat must be one of ${STATS.join(', ')}`);
   }
-  return spec;
+  return spec as Spec;
 }

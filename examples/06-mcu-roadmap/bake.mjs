@@ -6,8 +6,8 @@
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { source } from '../../tools/sources.mjs';
-import { clipPolyline } from '../../tools/geo.mjs';
+import { source } from '../../tools/sources.ts';
+import { clipPolyline } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/06-mcu-roadmap';
 const pbf = source('osm-tokyo23');

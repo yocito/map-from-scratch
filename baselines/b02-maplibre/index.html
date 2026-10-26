@@ -40,7 +40,7 @@ map.on('click', (e) => {
 await new Promise((r) => map.once('idle', r));
 
 if (new URLSearchParams(location.search).has('bench')) {
-  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.js');
+  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.ts');
   const gl = map.getCanvas().getContext('webgl2');
   emit({ metric: 'first_frame_ms', value: performance.now() });
   emit({ info: { gpu: glRenderer(gl), maplibre: maplibregl.getVersion() } });

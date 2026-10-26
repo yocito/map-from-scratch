@@ -1,7 +1,7 @@
 // Bench branch for 07, loaded only with ?bench so it is not part of the page
 // a visitor downloads.
-import { emit, glRenderer, benchFrames, zoomPath } from '../../harness/page/bench.js';
-import { equalEarth } from '../../tools/geo.mjs';
+import { emit, glRenderer, benchFrames, zoomPath } from '../../harness/page/bench.ts';
+import { equalEarth } from '../../tools/geo.ts';
 
 // mounted: performance.now() right after mount() resolved, taken in index.html
 // before this file was imported, so the import is not counted as start-up.

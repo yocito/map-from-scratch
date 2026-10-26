@@ -1,25 +1,34 @@
 // Bench-mode helpers for browser renderers. A page imports this file only
 // when its URL has ?bench, so none of it counts toward the renderer's
 // footprint.
-export const emit = (o) =>
+declare global {
+  interface Window { __mfsEmit?: (payload: string) => void }
+}
+
+export const emit = (o: object): void =>
   window.__mfsEmit ? window.__mfsEmit(JSON.stringify(o)) : console.log('@mfs ' + JSON.stringify(o));
 
-export function glRenderer(gl) {
+export function glRenderer(gl: WebGL2RenderingContext): string {
   const dbg = gl.getExtension('WEBGL_debug_renderer_info');
   return dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
 }
 
-const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
+const nextFrame = () => new Promise<number>((r) => requestAnimationFrame(r));
 
 // Runs drawStep(i) for i in [0, steps) back to back and reports, per frame:
 //   cpu_ms    time spent in JS issuing the frame
 //   frame_ms  issue + wait until the GPU has finished (1-pixel readPixels)
 //   gpu_ms    GPU time from EXT_disjoint_timer_query_webgl2, when available
 // prefix names a fixed-view run (e.g. "whole_") apart from the main path.
-export async function benchFrames(gl, steps, drawStep, { warmup = 10, prefix = '' } = {}) {
+export async function benchFrames(
+  gl: WebGL2RenderingContext,
+  steps: number,
+  drawStep: (i: number) => void,
+  { warmup = 10, prefix = '' }: { warmup?: number; prefix?: string } = {},
+): Promise<void> {
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const px = new Uint8Array(4);
-  const cpu = [], frame = [], queries = [];
+  const cpu: number[] = [], frame: number[] = [], queries: WebGLQuery[] = [];
   for (let i = -warmup; i < steps; i++) {
     const k = ((i % steps) + steps) % steps;
     const q = ext && i >= 0 ? gl.createQuery() : null;
@@ -38,7 +47,7 @@ export async function benchFrames(gl, steps, drawStep, { warmup = 10, prefix = '
   emit({ metric: `${prefix}cpu_ms`, values: cpu });
   emit({ metric: `${prefix}frame_ms`, values: frame });
   if (!ext) return;
-  const gpu = [];
+  const gpu: number[] = [];
   for (const q of queries) {
     while (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) await nextFrame();
     if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) gpu.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
@@ -49,7 +58,9 @@ export async function benchFrames(gl, steps, drawStep, { warmup = 10, prefix = '
 
 // A camera path for 2D maps: zoom in towards a point and back out while
 // panning, so every frame differs.
-export function zoomPath(steps, { cx, cy, z0, z1, pan = 0 }) {
+export interface CameraStep { cx: number; cy: number; zoom: number }
+
+export function zoomPath(steps: number, { cx, cy, z0, z1, pan = 0 }: { cx: number; cy: number; z0: number; z1: number; pan?: number }): CameraStep[] {
   return Array.from({ length: steps }, (_, i) => {
     const u = i / (steps - 1);
     const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * u);

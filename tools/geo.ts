@@ -3,13 +3,17 @@
 // simplified and triangulated for exactly the map it draws.
 import earcut from '../vendor/earcut/earcut.js';
 
+export type Point = number[];          // [x, y, ...extra] — extra values ride along
+export type Ring = Point[];
+export type Box = [number, number, number, number];
+
 const RAD = Math.PI / 180;
 
 // Equal Earth (Šavrič, Patterson, Jenny 2018), unit sphere.
 // x in [-2.7066, 2.7066], y in [-1.3174, 1.3174], north up.
 const A1 = 1.340264, A2 = -0.081106, A3 = 0.000893, A4 = 0.003796;
 const M = Math.sqrt(3) / 2;
-export function equalEarth([lon, lat]) {
+export function equalEarth([lon, lat]: Point): [number, number] {
   const t = Math.asin(M * Math.sin(lat * RAD));
   const t2 = t * t, t6 = t2 * t2 * t2;
   const x = (2 * Math.sqrt(3) * lon * RAD * Math.cos(t)) / (3 * (9 * A4 * t6 * t2 + 7 * A3 * t6 + 3 * A2 * t2 + A1));
@@ -18,20 +22,20 @@ export function equalEarth([lon, lat]) {
 }
 
 // Web Mercator in the unit square: x 0..1 west to east, y 0..1 north to south.
-export function mercator([lon, lat]) {
+export function mercator([lon, lat]: Point): [number, number] {
   const s = Math.sin(Math.max(-85.0511, Math.min(85.0511, lat)) * RAD);
   return [lon / 360 + 0.5, 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)];
 }
 
 // Douglas–Peucker, iterative. tolerance 0 returns the input.
-export function simplify(pts, tolerance) {
+export function simplify<P extends Point>(pts: P[], tolerance: number): P[] {
   if (tolerance <= 0 || pts.length < 3) return pts;
   const keep = new Uint8Array(pts.length);
   keep[0] = keep[pts.length - 1] = 1;
-  const stack = [[0, pts.length - 1]];
+  const stack: [number, number][] = [[0, pts.length - 1]];
   const tol2 = tolerance * tolerance;
   while (stack.length) {
-    const [a, b] = stack.pop();
+    const [a, b] = stack.pop()!;
     const [ax, ay] = pts[a], [bx, by] = pts[b];
     const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
     let best = -1, bestD = tol2;
@@ -53,16 +57,16 @@ export function simplify(pts, tolerance) {
   return pts.filter((_, i) => keep[i]);
 }
 
-function openRing(ring) {
+function openRing(ring: Ring): Ring {
   const n = ring.length;
   if (n > 1 && ring[0][0] === ring[n - 1][0] && ring[0][1] === ring[n - 1][1]) return ring.slice(0, -1);
   return ring;
 }
 
 // rings: [outer, ...holes] in any planar coordinates (closed or open).
-export function triangulatePolygon(rings) {
-  const vertices = [];
-  const holes = [];
+export function triangulatePolygon(rings: Ring[]): { vertices: number[]; indices: number[] } {
+  const vertices: number[] = [];
+  const holes: number[] = [];
   for (const [i, ring] of rings.entries()) {
     if (i > 0) holes.push(vertices.length / 2);
     for (const [x, y] of openRing(ring)) vertices.push(x, y);
@@ -70,19 +74,19 @@ export function triangulatePolygon(rings) {
   return { vertices, indices: earcut(vertices, holes) };
 }
 
-export function polygonsOf(geometry) {
+export function polygonsOf(geometry: { type: string; coordinates: unknown } | null | undefined): Ring[][] {
   if (!geometry) return [];
-  if (geometry.type === 'Polygon') return [geometry.coordinates];
-  if (geometry.type === 'MultiPolygon') return geometry.coordinates;
+  if (geometry.type === 'Polygon') return [geometry.coordinates as Ring[]];
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates as Ring[][];
   return [];
 }
 
 // Clip a polyline to [minx, miny, maxx, maxy] (Liang–Barsky per segment).
 // Returns the pieces that lie inside; a line that leaves and comes back
 // becomes two pieces.
-export function clipPolyline(pts, [x0, y0, x1, y1]) {
-  const out = [];
-  let cur = null;
+export function clipPolyline(pts: Point[], [x0, y0, x1, y1]: Box): Ring[] {
+  const out: Ring[] = [];
+  let cur: Ring | null = null;
   for (let i = 1; i < pts.length; i++) {
     const [ax, ay] = pts[i - 1], [bx, by] = pts[i];
     const dx = bx - ax, dy = by - ay;

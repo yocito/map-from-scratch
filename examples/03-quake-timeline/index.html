@@ -57,8 +57,8 @@ $('play').addEventListener('click', () => {
 show();
 
 if (new URLSearchParams(location.search).has('bench')) {
-  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.js');
-  const { equalEarth } = await import('../../tools/geo.mjs');
+  const { emit, glRenderer, benchFrames, zoomPath } = await import('../../harness/page/bench.ts');
+  const { equalEarth } = await import('../../tools/geo.ts');
   const { gl, state } = map;
   gl.canvas.addEventListener('webglcontextlost', () => emit({ error: 'webgl context lost' }));
   map.draw();
