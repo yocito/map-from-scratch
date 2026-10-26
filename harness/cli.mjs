@@ -4,6 +4,7 @@
 //   bake  <id|all>             prepare data (spec.bake)
 //   build <id|all>             compile (spec.build)
 //   bench <id|all> [-n N]      measure and check budgets
+//   report                     latest results of every example, as Markdown
 //   serve [port]               serve the repo for interactive use
 //   test                       harness unit tests
 import { readdirSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
@@ -20,11 +21,21 @@ import { benchNative } from './runners/native.mjs';
 import { benchBrowser } from './runners/browser.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const examplesDir = join(root, 'examples');
 
+// Examples are the purpose-built renderers; baselines are the same requests
+// done with a general-purpose engine, kept only to measure against.
+const SPEC_DIRS = ['examples', 'baselines'];
+const dirOf = new Map();
 function allIds() {
-  return readdirSync(examplesDir).filter((d) => existsSync(join(examplesDir, d, 'spec.json'))).sort();
+  dirOf.clear();
+  for (const d of SPEC_DIRS) {
+    const base = join(root, d);
+    if (!existsSync(base)) continue;
+    for (const id of readdirSync(base)) if (existsSync(join(base, id, 'spec.json'))) dirOf.set(id, join(base, id));
+  }
+  return [...dirOf.keys()].sort();
 }
+const specDir = (id) => (dirOf.size ? dirOf : (allIds(), dirOf)).get(id);
 
 function select(arg) {
   if (!arg) throw new Error('example id (or "all") required');
@@ -35,7 +46,7 @@ function select(arg) {
 }
 
 function runStep(id, key) {
-  const spec = loadSpec(join(examplesDir, id));
+  const spec = loadSpec(specDir(id));
   if (!spec[key]) return;
   console.log(`[${id}] ${key}: ${spec[key].join(' ')}`);
   const r = spawnSync(spec[key][0], spec[key].slice(1), { cwd: root, stdio: 'inherit' });
@@ -57,7 +68,7 @@ function fmt(x) {
 }
 
 async function bench(id, iterations) {
-  const spec = loadSpec(join(examplesDir, id));
+  const spec = loadSpec(specDir(id));
   const outDir = join(root, 'results', id);
   mkdirSync(outDir, { recursive: true });
   const n = iterations ?? spec.iterations;
@@ -66,7 +77,7 @@ async function bench(id, iterations) {
   for (const [k, v] of Object.entries(measureFootprint(root, spec.footprint))) raw.metrics[k] = [v];
   if (spec.footprint.elf) for (const [k, v] of Object.entries(measureElf(root, spec.footprint.elf))) raw.metrics[k] = [v];
   raw.metrics.dependencies = [spec.dependencies.length];
-  for (const d of checkDependencies(spec.dependencies)) raw.errors.push(`dependency not allowed: ${d}`);
+  if (!spec.baseline) for (const d of checkDependencies(spec.dependencies)) raw.errors.push(`dependency not allowed: ${d}`);
   if (spec.gpu === 'hardware' && !raw.info.gpu) raw.errors.push('renderer did not report info.gpu');
   if (spec.gpu === 'hardware' && isSoftwareGpu(raw.info.gpu)) raw.errors.push(`software GPU: ${raw.info.gpu}`);
   const summaries = Object.fromEntries(Object.entries(raw.metrics).map(([k, v]) => [k, summarize(v)]));
@@ -107,7 +118,7 @@ async function main(argv) {
   const iterations = nIdx >= 0 ? Number(rest[nIdx + 1]) : undefined;
   switch (cmd) {
     case 'list':
-      for (const id of allIds()) console.log(`${id}\n  ${loadSpec(join(examplesDir, id)).request}`);
+      for (const id of allIds()) console.log(`${id}\n  ${loadSpec(specDir(id)).request}`);
       return 0;
     case 'bake':
     case 'build':
@@ -117,6 +128,26 @@ async function main(argv) {
       let ok = true;
       for (const id of select(arg)) ok = (await bench(id, iterations)) && ok;
       return ok ? 0 : 1;
+    }
+    case 'report': {
+      const kb = (b) => (b === undefined ? '-' : b < 10240 ? `${b} B` : `${(b / 1024).toFixed(0)} KB`);
+      const ms = (v) => (v === undefined || v === null ? '-' : `${Number(v.toPrecision(3))} ms`);
+      console.log('| 例 | 実行環境 | 配るコード | データ | 初回描画 p50 | フレーム p95 | 予算 |');
+      console.log('| --- | --- | --- | --- | --- | --- | --- |');
+      for (const id of allIds()) {
+        const f = join(root, 'results', id, 'latest.json');
+        if (!existsSync(f)) { console.log(`| ${id} | 未計測 | | | | | |`); continue; }
+        const r = JSON.parse(readFileSync(f, 'utf8'));
+        const s = (k, st = 'p50') => r.summaries[k]?.[st];
+        const spec = loadSpec(specDir(id));
+        const env = spec.runtime === 'native' ? (spec.gpu === 'none' ? 'C (MCU)' : 'C + EGL/GLES3') : (r.env.gpu ? 'WebGL2' : 'Canvas 2D');
+        const code = s('elf_text_bytes') !== undefined ? `${kb(s('elf_text_bytes'))} (.text)` : s('code_bytes') > 20000 ? `${kb(s('code_bytes'))} (実行ファイル)` : `${kb(s('code_gzip_bytes'))} gzip`;
+        const data = s('elf_rodata_bytes') !== undefined ? `${kb(s('elf_rodata_bytes'))} (.rodata)` : `${kb(s('data_gzip_bytes'))} gzip`;
+        const passed = r.budgets.filter((b) => b.pass).length;
+        const ok = r.errors.length === 0 && passed === r.budgets.length;
+        console.log(`| ${id} | ${env} | ${code} | ${data} | ${ms(s('first_frame_ms'))} | ${ms(s('frame_ms', 'p95') ?? s('frame_interval_ms', 'p95'))} | ${ok ? '全部通過' : '未達あり'} ${passed}/${r.budgets.length} |`);
+      }
+      return 0;
     }
     case 'serve': {
       const port = Number(arg ?? 8080);

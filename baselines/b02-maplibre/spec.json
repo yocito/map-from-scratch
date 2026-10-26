@@ -1,0 +1,19 @@
+{
+  "id": "b02-maplibre",
+  "request": "（比較用）02 と同じ依頼を汎用地図エンジン MapLibre GL JS 5.24.0 で作ったもの。",
+  "baseline": true,
+  "runtime": "browser",
+  "bake": ["sh", "-c", "node baselines/b02-maplibre/bake.mjs && mkdir -p .cache/baselines && cd .cache/baselines && npm install --no-audit --no-fund --silent maplibre-gl@5.24.0"],
+  "dependencies": ["maplibre-gl"],
+  "run": {
+    "page": "baselines/b02-maplibre/index.html",
+    "viewport": { "width": 390, "height": 844, "deviceScaleFactor": 3, "mobile": true },
+    "cpuThrottle": 4
+  },
+  "iterations": 5,
+  "footprint": {
+    "code": [".cache/baselines/node_modules/maplibre-gl/dist/maplibre-gl.js", ".cache/baselines/node_modules/maplibre-gl/dist/maplibre-gl.css"],
+    "data": ["data/baked/b02-maplibre/countries.geojson"]
+  },
+  "budgets": {}
+}
