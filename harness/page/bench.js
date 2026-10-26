@@ -15,7 +15,8 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(r));
 //   cpu_ms    time spent in JS issuing the frame
 //   frame_ms  issue + wait until the GPU has finished (1-pixel readPixels)
 //   gpu_ms    GPU time from EXT_disjoint_timer_query_webgl2, when available
-export async function benchFrames(gl, steps, drawStep, { warmup = 10 } = {}) {
+// prefix names a fixed-view run (e.g. "whole_") apart from the main path.
+export async function benchFrames(gl, steps, drawStep, { warmup = 10, prefix = '' } = {}) {
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const px = new Uint8Array(4);
   const cpu = [], frame = [], queries = [];
@@ -34,8 +35,8 @@ export async function benchFrames(gl, steps, drawStep, { warmup = 10 } = {}) {
     frame.push(t2 - t0);
     if (q) queries.push(q);
   }
-  emit({ metric: 'cpu_ms', values: cpu });
-  emit({ metric: 'frame_ms', values: frame });
+  emit({ metric: `${prefix}cpu_ms`, values: cpu });
+  emit({ metric: `${prefix}frame_ms`, values: frame });
   if (!ext) return;
   const gpu = [];
   for (const q of queries) {
@@ -43,7 +44,7 @@ export async function benchFrames(gl, steps, drawStep, { warmup = 10 } = {}) {
     if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) gpu.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
     gl.deleteQuery(q);
   }
-  emit({ metric: 'gpu_ms', values: gpu });
+  emit({ metric: `${prefix}gpu_ms`, values: gpu });
 }
 
 // A camera path for 2D maps: zoom in towards a point and back out while

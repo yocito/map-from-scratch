@@ -32,6 +32,8 @@ fi
 SOURCES=${MFS_SOURCES-/sata_hdd_24tb}
 [[ -n "$SOURCES" && -d "$SOURCES" ]] && args+=(-v "$SOURCES:$SOURCES:ro")
 [[ "${1:-}" == serve ]] && args+=(-p "${MFS_PORT:-8080}:${2:-8080}")
+[[ -n "${MFS_PAGE_QUERY:-}" ]] && args+=(-e "MFS_PAGE_QUERY=$MFS_PAGE_QUERY")
+[[ -n "${MFS_CHROME_FLAGS:-}" ]] && args+=(-e "MFS_CHROME_FLAGS=$MFS_CHROME_FLAGS")
 [[ -n "${DISPLAY:-}" && -d /tmp/.X11-unix ]] && args+=(-e "DISPLAY=$DISPLAY" -v /tmp/.X11-unix:/tmp/.X11-unix)
 
 exec docker run "${args[@]}" "$IMAGE" node harness/cli.mjs "$@"

@@ -139,14 +139,16 @@ async function runOnce(chrome, url, spec, outDir, i, collector, screenshot) {
 
 export async function benchBrowser(root, spec, outDir, { iterations }) {
   const server = await serve(root);
-  const url = `http://127.0.0.1:${server.address().port}/${spec.run.page}?bench=1`;
+  // MFS_PAGE_QUERY appends parameters, for comparing variants of a renderer.
+  const extra = process.env.MFS_PAGE_QUERY ? `&${process.env.MFS_PAGE_QUERY}` : '';
+  const url = `http://127.0.0.1:${server.address().port}/${spec.run.page}?bench=1${extra}`;
   const logFile = join(outDir, 'chrome.log');
   writeFileSync(logFile, '');
   const chrome = await launchChrome(logFile);
   const collector = new Collector();
   try {
     const { product } = await chrome.cdp.send('Browser.getVersion');
-    collector.add({ info: { browser: product } });
+    collector.add({ info: { browser: product, page_query: process.env.MFS_PAGE_QUERY ?? '' } });
     const warm = new Collector();
     const warmSpec = { run: { viewport: { width: 64, height: 64, deviceScaleFactor: 1, mobile: false }, cpuThrottle: 1 }, timeoutMs: 30000 };
     const base = url.slice(0, url.indexOf('/', 'http://'.length));
