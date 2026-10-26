@@ -1,0 +1,39 @@
+id: 08-prefecture-quiz
+request: 日本地図を使って、示された都道府県の場所を順に当てるクイズを遊びたい。
+requirements:
+  - id: locate-prefecture
+    need: 示された都道府県を地図上で選べる
+    unmeasured: 操作結果は画面に表示する。性能計測は未実施。
+  - id: complete-all
+    need: 47 都道府県を重複せず出題する
+    unmeasured: 出題順をシャッフルする。自動検証は未実施。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/08-prefecture-quiz/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 2, mobile: true}
+  iterations: 1
+  scenarios: []
+datasets:
+  sources:
+    - id: ne-japan-prefectures
+      origin: Natural Earth 10m Admin 1 v5.1.1 の日本 47 都道府県
+      license: Public domain
+  outputs: [data/baked/01-prefecture-picker/prefectures.json]
+  preparation:
+    - 01 のベイク済み Path2D 用データを使用する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D と Path2D
+    language: TypeScript
+    gpu: none
+    code: [examples/08-prefecture-quiz/index.html, examples/08-prefecture-quiz/main.ts]
+    dependencies: []
+    why: 47 個の固定図形なので Canvas 2D の塗りと標準の当たり判定で足りる
+  alternatives: []
+  not_doing: [パン, ズーム, タイル, 3D]
+verification:
+  checks: []
