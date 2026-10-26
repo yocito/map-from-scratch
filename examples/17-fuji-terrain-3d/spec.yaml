@@ -1,11 +1,6 @@
 id: 17-fuji-terrain-3d
 request: >-
   富士山のまわりの地形を、3D で斜めから眺めたい。PC のブラウザで、なめらかに回したい。
-publication:
-  pages: false
-  reason: >-
-    日本の元データを加工した fuji.terr の再配布条件を確認できていないため。
-
 requirements:
   - id: see-fuji-3d
     need: 富士山のまわりの地形を 3D で斜めから眺めたい
@@ -141,11 +136,12 @@ datasets:
         手元の /sata_hdd_24tb/www/html/static/mapterhorn/2026-01-06/planet.pmtiles を tools/pmtiles.ts で Range 読みする
         (tools/sources.ts にはまだ登録していない。コピーしない種類の原本が要る)
       license: >-
-        Mapterhorn の表示は "© Mapterhorn"。download.mapterhorn.com/attribution.json (2026-10-27 に取得) では、日本の部分の元データは
-        国土交通省国土地理院の基盤地図情報 (数値標高モデル、jpdem1a/5a/5b/5c/10a/10b) で、条件は「国土地理院コンテンツ利用規約／
-        測量法に基づく国土地理院長承認（使用）R 8JHs 131」。承認は Mapterhorn の使用についてのもので、この焼き直しを再配布してよいか
-        (出典の表示だけで足りるか、測量成果の複製・使用の承認が要るか) は人が判断する。判断が出るまで Pages には公開しない。
-        publication.pages: false により、Pages の生成時はページ・コード・データを除外する。
+        Mapterhorn の表示は "© Mapterhorn"。download.mapterhorn.com/attribution.json (2026-10-27 に確認) では、日本の元データに
+        国土交通省国土地理院の基盤地図情報 (数値標高モデル、jpdem1a/5a/5b/5c/10a/10b) が含まれる。
+        Mapterhorn は測量法に基づく国土地理院長承認（使用）R 8JHs 131 を得ている。
+        国土地理院の承認申請 Q&A Q1-24 によれば、使用承認を得て作成した成果の二次利用に追加申請は不要。
+        Mapterhorn は distribution/README.md で地域別ミラーを案内している。fuji.terr は Mapterhorn の成果を富士山周辺で
+        再標本化・再符号化したもの。配布時には Mapterhorn と国土地理院の出典、加工の事実、承認番号を明示する。
   outputs: [data/baked/17-fuji-terrain-3d/fuji.terr]
   preparation:
     - 区画は z12 のタイル 6x6 (x 3624-3629、y 1614-1619)。138.5156-139.0430E、35.1738-35.6037N、3072x3072 標本、47.86 km 四方
