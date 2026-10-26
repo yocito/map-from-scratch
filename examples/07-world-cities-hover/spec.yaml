@@ -61,7 +61,7 @@ benchmarks:
       metrics: [reachable_ratio]
 
 datasets:
-  bake: [node, examples/07-world-cities-hover/bake.mjs]
+  bake: [node, examples/07-world-cities-hover/bake.ts]
   sources:
     - id: ne-populated-places
       origin: Natural Earth 10m populated places v5.1.2 (7,342 都市)
@@ -101,11 +101,11 @@ architecture_selection:
   chosen:
     platform: browser
     api: WebGL2 (ステンシル)
-    language: JavaScript (ES modules、ビルドなし)
+    language: TypeScript (ES modules、ビルドなし。配るときは型を外すだけ)
     gpu: hardware
-    code: [examples/07-world-cities-hover/index.html, examples/07-world-cities-hover/cities.js]
+    code: [examples/07-world-cities-hover/index.html, examples/07-world-cities-hover/main.ts, examples/07-world-cities-hover/cities.ts]
     dependencies: []
-    why: 7,342 個の円と陸を、ズームしても滑らかに描くために GPU で描く。依頼が「ページ全体」なので index.html もコードに数え、計測用コードは bench.js に分けた
+    why: 7,342 個の円と陸を、ズームしても滑らかに描くために GPU で描く。依頼が「ページ全体」なので index.html もコードに数え、計測用コードは bench.ts に分けた
   alternatives:
     - option: Canvas 2D
       rejected_because: 比べていない

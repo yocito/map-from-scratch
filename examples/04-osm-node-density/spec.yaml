@@ -47,7 +47,7 @@ benchmarks:
       metrics: [street_cpu_ms, street_frame_ms, street_gpu_ms]
 
 datasets:
-  bake: [node, examples/04-osm-node-density/bake.mjs]
+  bake: [node, examples/04-osm-node-density/bake.ts]
   sources:
     - id: osm-tokyo23
       origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点 (9,659,934 ノード)
@@ -81,9 +81,9 @@ architecture_selection:
   chosen:
     platform: browser
     api: WebGL2 (EXT_color_buffer_float と EXT_float_blend)
-    language: JavaScript (ES modules、ビルドなし)
+    language: TypeScript (ブラウザには型を除いた ES modules を配る。ビルドなし)
     gpu: hardware
-    code: [examples/04-osm-node-density/density.js]
+    code: [examples/04-osm-node-density/density.ts]
     dependencies: []
     why: 966 万点を毎フレーム数え直すには、GPU の加算ブレンドで数えるのが最も短い。浮動小数点の加算ブレンドは WebGL2 の拡張で使える
   alternatives:

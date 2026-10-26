@@ -15,6 +15,15 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { source } from '../../tools/sources.ts';
 import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.ts';
+import type { Point } from '../../tools/geo.ts';
+
+// The Natural Earth fields this bake reads.
+interface CountryFeature {
+  properties: { ADM0_A3: string; NAME: string; NAME_JA?: string; POP_EST: number };
+  geometry: { type: string; coordinates: unknown } | null;
+}
+// One row of countries.json: [iso_a3, name_ja, population].
+type CountryRow = [string, string, number];
 
 const OUT = 'data/baked/02-world-population-mobile';
 const X = 2.7066, Y = 1.3174;           // Equal Earth extent
@@ -22,10 +31,10 @@ const MAX_ZOOM = 32;                     // world width = 32 screens at max zoom
 const SCREEN_PX = 390 * 3;               // phone width in device pixels
 const TOL = (2 * X) / (SCREEN_PX * MAX_ZOOM) * 1.5;  // 1.5 device px at max zoom
 
-const fc = JSON.parse(readFileSync(source('ne-countries'), 'utf8'));
-const q = ([x, y]) => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
+const fc: { features: CountryFeature[] } = JSON.parse(readFileSync(source('ne-countries'), 'utf8'));
+const q = ([x, y]: Point): [number, number] => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
 
-const verts = [], tris = [], ringLens = [], countries = [];
+const verts: number[] = [], tris: number[] = [], ringLens: number[] = [], countries: CountryRow[] = [];
 let rawPts = 0;
 for (const f of fc.features) {
   const id = countries.length;
@@ -45,7 +54,7 @@ for (const f of fc.features) {
 }
 
 const nv = verts.length / 3;
-const delta16 = (a) => a.map((v, i) => (v - (i ? a[i - 1] : 0)) & 0xffff);
+const delta16 = (a: number[]) => a.map((v, i) => (v - (i ? a[i - 1] : 0)) & 0xffff);
 const xs = verts.filter((_, i) => i % 3 === 0), ys = verts.filter((_, i) => i % 3 === 1);
 const ids = verts.filter((_, i) => i % 3 === 2);
 const triDelta = tris.map((v, i) => (v - (i ? tris[i - 1] : 0)) >>> 0);

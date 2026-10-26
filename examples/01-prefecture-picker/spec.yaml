@@ -52,7 +52,7 @@ benchmarks:
       metrics: [pick_ms]
 
 datasets:
-  bake: [node, examples/01-prefecture-picker/bake.mjs]
+  bake: [node, examples/01-prefecture-picker/bake.ts]
   sources:
     - id: ne-japan-prefectures
       origin: Natural Earth 10m Admin 1 (states and provinces) v5.1.1、日本の 47 件
@@ -85,9 +85,9 @@ architecture_selection:
   chosen:
     platform: browser
     api: Canvas 2D (Path2D と isPointInPath)
-    language: JavaScript (ES modules、ビルドなし)
+    language: TypeScript (ブラウザには型を除いた ES modules を配る。ビルドなし)
     gpu: none
-    code: [examples/01-prefecture-picker/picker.js]
+    code: [examples/01-prefecture-picker/picker.ts]
     dependencies: []
     why: 47 個の固定の形を描いて当てるだけなので、パースも当たり判定もブラウザ内蔵の Path2D に任せられる
   alternatives:

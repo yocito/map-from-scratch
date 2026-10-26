@@ -45,14 +45,14 @@ const span = Math.max((e - w) * k, nn - s);
 
 // Morton code of the quantised point carries both coordinates, so sorting the
 // codes sorts the points.
-const part = (v) => {
+const part = (v: number): number => {
   v &= 0xffff;
   v = (v | (v << 8)) & 0x00ff00ff;
   v = (v | (v << 4)) & 0x0f0f0f0f;
   v = (v | (v << 2)) & 0x33333333;
   return (v | (v << 1)) & 0x55555555;
 };
-const unpart = (v) => {
+const unpart = (v: number): number => {
   v &= 0x55555555;
   v = (v | (v >>> 1)) & 0x33333333;
   v = (v | (v >>> 2)) & 0x0f0f0f0f;

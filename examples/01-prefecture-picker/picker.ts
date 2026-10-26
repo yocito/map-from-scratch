@@ -1,11 +1,23 @@
 // Prefecture picker: 47 baked SVG paths drawn with Canvas 2D.
 // Parsing is Path2D's, hit testing is isPointInPath's.
 // el receives a "prefecture" CustomEvent ({code, name}) on selection.
-export async function mount(el, url) {
-  const { w, h, p } = await (await fetch(url)).json();
-  const prefs = p.map(([code, name, d]) => ({ code, name, path: new Path2D(d) }));
+// prefectures.json as bake.ts writes it: grid size and [code, name, path] rows.
+interface Baked { w: number; h: number; p: [string, string, string][] }
+export interface Prefecture { code: string; name: string; path: Path2D }
+export interface PrefectureDetail { code: string; name: string }
+export interface Picker {
+  ctx: CanvasRenderingContext2D;
+  prefs: Prefecture[];
+  pick(x: number, y: number): number;
+  draw(): void;
+  setHover(i: number): void;
+}
+
+export async function mount(el: HTMLElement, url: string): Promise<Picker> {
+  const { w, h, p }: Baked = await (await fetch(url)).json();
+  const prefs = p.map(([code, name, d]): Prefecture => ({ code, name, path: new Path2D(d) }));
   const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d')!;  // a fresh canvas always gives a 2D context
   canvas.style.display = 'block';
   el.append(canvas);
   let hover = -1, selected = -1, k = 1;
@@ -25,7 +37,7 @@ export async function mount(el, url) {
     });
   }
 
-  function setHover(i) {
+  function setHover(i: number) {
     if (i !== hover) { hover = i; draw(); }
   }
 
@@ -39,13 +51,13 @@ export async function mount(el, url) {
   }
 
   // x, y in CSS pixels relative to the canvas. Returns an index or -1.
-  function pick(x, y) {
+  function pick(x: number, y: number) {
     const dx = x * devicePixelRatio, dy = y * devicePixelRatio;
     for (let i = 0; i < prefs.length; i++) if (ctx.isPointInPath(prefs[i].path, dx, dy)) return i;
     return -1;
   }
 
-  const at = (e) => {
+  const at = (e: MouseEvent) => {
     const r = canvas.getBoundingClientRect();
     return pick(e.clientX - r.left, e.clientY - r.top);
   };
@@ -59,7 +71,7 @@ export async function mount(el, url) {
     if (i < 0) return;
     selected = i;
     draw();
-    el.dispatchEvent(new CustomEvent('prefecture', { detail: { code: prefs[i].code, name: prefs[i].name } }));
+    el.dispatchEvent(new CustomEvent<PrefectureDetail>('prefecture', { detail: { code: prefs[i].code, name: prefs[i].name } }));
   });
   // A lost 2D context comes back blank and with its transform reset, which
   // the hit test relies on: repaint everything.

@@ -42,29 +42,35 @@ void main() {
   o = vec4(c, (u_hl == 1 ? 1.0 : 0.75) * edge);
 }`;
 
-export async function mount(canvas, base, onHover) {
+export interface City { name: string; country: string; population: number }
+export type CityMap = Awaited<ReturnType<typeof mount>>;
+
+export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (c: City | null) => void) {
   const [land, cbin, nbin] = await Promise.all(['land.bin', 'cities.bin', 'names.bin']
     .map((f) => fetch(`${base}/${f}`).then((r) => r.arrayBuffer())));
-  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, stencil: true });
+  const ctx = canvas.getContext('webgl2', { antialias: true, alpha: false, stencil: true });
+  if (!ctx) throw new Error('WebGL2 is not available');
+  const gl: WebGL2RenderingContext = ctx;   // narrowed for the function declarations below
 
-  const program = (vs, fs) => {
+  const program = (vs: string, fs: string) => {
     const p = gl.createProgram();
-    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]] as const) {
       const s = gl.createShader(type);
+      if (!s) throw new Error('createShader failed');
       gl.shaderSource(s, src);
       gl.compileShader(s);
       gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    const u = (n) => gl.getUniformLocation(p, n);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? '');
+    const u = (n: string) => gl.getUniformLocation(p, n);
     return { p, cam: u('u_cam'), vp: u('u_vp'), px: u('u_px'), hl: u('u_hl') };
   };
   const landP = program(LAND_VS, LAND_FS), cityP = program(CITY_VS, CITY_FS);
 
-  // Undo the delta coding (see bake.mjs). Positions stay 16-bit for the GPU;
+  // Undo the delta coding (see bake.ts). Positions stay 16-bit for the GPU;
   // the CPU keeps world units for the hit test.
-  const undelta = (src, n) => {
+  const undelta = (src: Uint16Array, n: number) => {
     const out = new Uint16Array(2 * n);
     for (let i = 0, x = 0, y = 0; i < n; i++) {
       out[2 * i] = x = (x + src[i]) & 0xffff;
@@ -72,7 +78,7 @@ export async function mount(canvas, base, onHover) {
     }
     return out;
   };
-  const buffer = (target, data) => { gl.bindBuffer(target, gl.createBuffer()); gl.bufferData(target, data, gl.STATIC_DRAW); };
+  const buffer = (target: GLenum, data: BufferSource) => { gl.bindBuffer(target, gl.createBuffer()); gl.bufferData(target, data, gl.STATIC_DRAW); };
 
   // Land: fan triangles per ring, rebuilt here from ring lengths.
   const [lv, lr] = new Uint32Array(land, 0, 2);
@@ -106,7 +112,7 @@ export async function mount(canvas, base, onHover) {
 
   const cam = { x: 0.5, y: 0.5, zoom: 1 };   // zoom 1: the world fits the width
   let hover = -1, pending = false;
-  const W = () => canvas.width, H = () => canvas.height;
+  const W = (): number => canvas.width, H = (): number => canvas.height;
   const scale = () => cam.zoom * W();
 
   function draw() {
@@ -152,8 +158,8 @@ export async function mount(canvas, base, onHover) {
 
   // Device px -> world units, and the city under a device pixel: the last in
   // draw order whose disc (at least 2 CSS px) contains it, or -1.
-  const toWorld = (sx, sy) => [cam.x + (sx - W() / 2) / scale(), cam.y + (sy - H() / 2) / (scale() * AY)];
-  function pick(sx, sy) {
+  const toWorld = (sx: number, sy: number): [number, number] => [cam.x + (sx - W() / 2) / scale(), cam.y + (sy - H() / 2) / (scale() * AY)];
+  function pick(sx: number, sy: number): number {
     const [wx, wy] = toWorld(sx, sy);
     const kx = scale() / 65535, ky = kx * AY, dpr = devicePixelRatio;
     const ux = wx * 65535, uy = wy * 65535;
@@ -164,16 +170,16 @@ export async function mount(canvas, base, onHover) {
     }
     return -1;
   }
-  const city = (i) => ({ name: nn[i], country: cn[country[i]], population: pop[i] });
+  const city = (i: number): City => ({ name: nn[i], country: cn[country[i]], population: pop[i] });
 
-  function setHover(i) {
+  function setHover(i: number) {
     if (i === hover) return;
     hover = i;
     render();
     if (onHover) onHover(i < 0 ? null : city(i));
   }
 
-  function zoomAt(sx, sy, f) {
+  function zoomAt(sx: number, sy: number, f: number) {
     const [wx, wy] = toWorld(sx, sy);
     cam.zoom = Math.min(32, Math.max(1, cam.zoom * f));
     const [nx, ny] = toWorld(sx, sy);
@@ -183,11 +189,11 @@ export async function mount(canvas, base, onHover) {
   }
 
   // Mouse: hover identifies, drag pans, wheel zooms about the cursor.
-  const dev = (e) => {
+  const dev = (e: MouseEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
     return [(e.clientX - r.left) * devicePixelRatio, (e.clientY - r.top) * devicePixelRatio];
   };
-  let drag = null;
+  let drag: [number, number] | null = null;
   canvas.addEventListener('pointerdown', (e) => { drag = dev(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointerup', () => { drag = null; });
   canvas.addEventListener('pointerleave', () => setHover(-1));

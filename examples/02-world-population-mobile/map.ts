@@ -29,16 +29,31 @@ void main() {
 const BREAKS = [1e5, 1e6, 5e6, 1e7, 3e7, 1e8, 3e8];
 const COLORS = ['#fff7ec', '#fee8c8', '#fdd49e', '#fdbb84', '#fc8d59', '#e34a33', '#b30000', '#7f0000'];
 
-export async function mount(canvas, base, onPick) {
+// One row of countries.json: [iso_a3, name_ja, population], indexed by id.
+export type CountryRow = [string, string, number];
+export interface Country { code: string; name: string; population: number }
+export interface Camera { x: number; y: number; zoom: number }
+export interface WorldMap {
+  gl: WebGL2RenderingContext;
+  cam: Camera;
+  draw(): void;
+  pick(sx: number, sy: number): number;   // country id, -1 for none
+  select(id: number): void;
+  countries: CountryRow[];
+  vertices: number;
+  triangles: number;
+}
+
+export async function mount(canvas: HTMLCanvasElement, base: string, onPick?: (c: Country | null) => void): Promise<WorldMap> {
   const [bin, countries] = await Promise.all([
     fetch(`${base}/world.bin`).then((r) => r.arrayBuffer()),
-    fetch(`${base}/countries.json`).then((r) => r.json()),
+    fetch(`${base}/countries.json`).then((r) => r.json() as Promise<CountryRow[]>),
   ]);
-  // Undo the bake's delta coding (see bake.mjs for the layout). Borders are
+  // Undo the bake's delta coding (see bake.ts for the layout). Borders are
   // rebuilt from ring lengths: segments between consecutive ring vertices.
   const [nv, nt, nr] = new Uint32Array(bin, 0, 3);
   let o = 12;
-  const take = (T, n) => { const a = new T(bin, o, n); o += n * T.BYTES_PER_ELEMENT; return a; };
+  const take = <A>(T: { new (b: ArrayBuffer, o: number, n: number): A; BYTES_PER_ELEMENT: number }, n: number): A => { const a = new T(bin, o, n); o += n * T.BYTES_PER_ELEMENT; return a; };
   const dx = take(Uint16Array, nv), dy = take(Uint16Array, nv), ids = take(Uint16Array, nv);
   o = (o + 3) & ~3;
   const rings = take(Uint32Array, nr), dt = take(Uint32Array, nt);
@@ -54,20 +69,24 @@ export async function mount(canvas, base, onPick) {
     for (let j = 0; j < rings[r]; j++) { idx[k++] = s + j; idx[k++] = s + ((j + 1) % rings[r]); }
   }
 
-  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, preserveDrawingBuffer: false });
-  const sh = (type, src) => {
-    const s = gl.createShader(type);
+  const ctx = canvas.getContext('webgl2', { antialias: true, alpha: false, preserveDrawingBuffer: false });
+  if (!ctx) throw new Error('WebGL2 is not available');
+  const gl = ctx;   // stays narrowed inside the function declarations below
+  // create* and getProgramInfoLog return null only on a lost context; the
+  // next GL call then throws, as it did before the types.
+  const sh = (type: GLenum, src: string): WebGLShader => {
+    const s = gl.createShader(type)!;
     gl.shaderSource(s, src);
     gl.compileShader(s);
     return s;
   };
-  const prog = gl.createProgram();
+  const prog = gl.createProgram()!;
   gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
   gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog)!);
   gl.useProgram(prog);
-  const u = (n) => gl.getUniformLocation(prog, n);
+  const u = (n: string) => gl.getUniformLocation(prog, n);
   const uCam = u('u_cam'), uVp = u('u_vp'), uMode = u('u_mode'), uSel = u('u_sel');
 
   gl.bindVertexArray(gl.createVertexArray());
@@ -104,7 +123,7 @@ export async function mount(canvas, base, onPick) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-  const cam = { x: 0.5, y: 0.5, zoom: 1 };   // zoom 1: the world fits the width
+  const cam: Camera = { x: 0.5, y: 0.5, zoom: 1 };   // zoom 1: the world fits the width
   let selected = 0xffff, pending = false;
   const W = () => canvas.width, H = () => canvas.height;
   const scale = () => cam.zoom * W();
@@ -127,10 +146,10 @@ export async function mount(canvas, base, onPick) {
   const render = () => { if (!pending) { pending = true; requestAnimationFrame(draw); } };
 
   // Screen px (device) -> world units.
-  const toWorld = (sx, sy) => [cam.x + (sx - W() / 2) / scale(), cam.y + (sy - H() / 2) / (scale() * (1.3174 / 2.7066))];
+  const toWorld = (sx: number, sy: number): [number, number] => [cam.x + (sx - W() / 2) / scale(), cam.y + (sy - H() / 2) / (scale() * (1.3174 / 2.7066))];
 
   // Pick by rendering ids into one pixel centred on the tap.
-  function pick(sx, sy) {
+  function pick(sx: number, sy: number): number {
     const [wx, wy] = toWorld(sx, sy);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
     gl.viewport(0, 0, 1, 1);
@@ -147,13 +166,13 @@ export async function mount(canvas, base, onPick) {
     return id === 0xffff ? -1 : id;
   }
 
-  function select(id) {
+  function select(id: number): void {
     selected = id < 0 ? 0xffff : id;
     render();
     if (onPick) onPick(id < 0 ? null : { code: countries[id][0], name: countries[id][1], population: countries[id][2] });
   }
 
-  function zoomAt(sx, sy, f) {
+  function zoomAt(sx: number, sy: number, f: number): void {
     const [wx, wy] = toWorld(sx, sy);
     cam.zoom = Math.min(32, Math.max(1, cam.zoom * f));
     const [nx, ny] = toWorld(sx, sy);
@@ -163,9 +182,9 @@ export async function mount(canvas, base, onPick) {
   }
 
   // Touch and mouse: one pointer pans, two pinch, a short still press picks.
-  const ptrs = new Map();
-  let down = null;
-  const dev = (e) => {
+  const ptrs = new Map<number, [number, number]>();
+  let down: { p: [number, number]; t: number; moved: boolean } | null = null;
+  const dev = (e: MouseEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
     return [(e.clientX - r.left) * devicePixelRatio, (e.clientY - r.top) * devicePixelRatio];
   };
@@ -176,7 +195,7 @@ export async function mount(canvas, base, onPick) {
   });
   canvas.addEventListener('pointermove', (e) => {
     if (!ptrs.has(e.pointerId)) return;
-    const prev = ptrs.get(e.pointerId), cur = dev(e);
+    const prev = ptrs.get(e.pointerId)!, cur = dev(e);   // has() checked above
     if (ptrs.size === 1) {
       cam.x -= (cur[0] - prev[0]) / scale();
       cam.y -= (cur[1] - prev[1]) / (scale() * (1.3174 / 2.7066));
@@ -191,7 +210,7 @@ export async function mount(canvas, base, onPick) {
     }
     ptrs.set(e.pointerId, cur);
   });
-  const up = (e) => {
+  const up = (e: PointerEvent) => {
     ptrs.delete(e.pointerId);
     if (down && !down.moved && e.timeStamp - down.t < 400) select(pick(...dev(e)));
     down = null;

@@ -47,7 +47,7 @@ benchmarks:
       metrics: [pick_ms]
 
 datasets:
-  bake: [node, examples/02-world-population-mobile/bake.mjs]
+  bake: [node, examples/02-world-population-mobile/bake.ts]
   sources:
     - id: ne-countries
       origin: Natural Earth 10m Admin 0 countries v5.1.1 (258 件、548,471 点)
@@ -75,17 +75,17 @@ performance_knowledge:
     evidence: 当たり判定が全部 0 を返した。フラグを外すと起きない
     applies_when: ハーネスの Chromium のフラグを変えるとき
   - id: maplibre-baseline
-    finding: 同じ依頼を MapLibre GL JS 5.24.0 で作ると、配るコードが 83 倍、初回描画が 5 倍になる
-    evidence: baselines/b02-maplibre (code gzip 286 KB、first_frame p50 1,144 ms)
+    finding: 同じ依頼を MapLibre GL JS 5.24.0 で作ると、配るコードが 88 倍、初回描画が 4.8 倍、JS ヒープが 46 倍になる
+    evidence: baselines/b02-maplibre (code gzip 279 KB、first_frame p50 770 ms、JS ヒープ 51 MB。02 は 3.2 KB、159 ms、1.1 MB。同じときに測定)
     applies_when: 汎用エンジンと比べるとき
 
 architecture_selection:
   chosen:
     platform: browser
     api: WebGL2
-    language: JavaScript (ES modules、ビルドなし)
+    language: TypeScript (ブラウザには型を除いた ES modules を配る。ビルドなし)
     gpu: hardware
-    code: [examples/02-world-population-mobile/map.js]
+    code: [examples/02-world-population-mobile/map.ts]
     dependencies: []
     why: 13 万頂点を 32 倍ズームまで滑らかに動かすので GPU で描く。WebGL2 ならスマホのブラウザで広く動く
   alternatives:

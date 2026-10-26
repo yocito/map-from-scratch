@@ -51,7 +51,7 @@ benchmarks:
       metrics: [wall_ms, process_cpu_ms, peak_rss_mb]
 
 datasets:
-  bake: [node, examples/05-tokyo-roads-native/bake.mjs]
+  bake: [node, examples/05-tokyo-roads-native/bake.ts]
   sources:
     - id: osm-tokyo23
       origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点。highway=* の way 286,195 本

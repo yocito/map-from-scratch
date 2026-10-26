@@ -15,19 +15,4 @@
 <canvas id="map"></canvas>
 <div id="tip"></div>
 <div id="key">人口<i style="width:3px;height:3px"></i>10万<i style="width:6px;height:6px"></i>100万<i style="width:19px;height:19px"></i>1000万</div>
-<script type="module">
-import { mount } from './cities.js';
-const tip = document.getElementById('tip');
-let mx = 0, my = 0;
-addEventListener('pointermove', (e) => {
-  mx = e.clientX; my = e.clientY;
-  tip.style.transform = `translate(${mx + 14}px,${my + 14}px)`;
-});
-// Digits grouped by a regex: the first toLocaleString('ja-JP') loads ICU data
-// and made the first hover 30-39 ms instead of 3 ms.
-const map = await mount(document.getElementById('map'), '../../data/baked/07-world-cities-hover', (c) => {
-  tip.textContent = c ? `${c.name} (${c.country})  人口 ${c.population ? String(c.population).replace(/\B(?=(\d{3})+$)/g, ',') + ' 人' : '不明'}` : '';
-});
-const mounted = performance.now();
-if (location.search.includes('bench')) (await import('./bench.js')).run(map, tip, mounted);
-</script>
+<script type="module" src="./main.ts"></script>

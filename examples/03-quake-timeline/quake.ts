@@ -52,24 +52,28 @@ void main() {
   o = vec4(v_col.rgb, v_col.a * a);
 }`;
 
-export async function mount(canvas, base) {
+export type QuakeMap = Awaited<ReturnType<typeof mount>>;
+
+export async function mount(canvas: HTMLCanvasElement, base: string) {
   const [land, quakes] = await Promise.all(
     ['land.bin', 'quakes.bin'].map((f) => fetch(`${base}/${f}`).then((r) => r.arrayBuffer())));
-  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+  const ctx = canvas.getContext('webgl2', { antialias: true, alpha: false });
+  if (!ctx) throw new Error('WebGL2 is not available');
+  const gl = ctx;   // stays narrowed inside the draw() declaration below
 
-  const program = (vs, fs) => {
+  const program = (vs: string, fs: string) => {
     const p = gl.createProgram();
-    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
-      const s = gl.createShader(type);
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]] as const) {
+      const s = gl.createShader(type)!;   // null only on a lost context
       gl.shaderSource(s, src);
       gl.compileShader(s);
       gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    const u = {};
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? '');
+    const u: Record<string, WebGLUniformLocation | null> = {};
     for (let i = 0; i < gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i++) {
-      const name = gl.getActiveUniform(p, i).name;
+      const name = gl.getActiveUniform(p, i)!.name;   // i < ACTIVE_UNIFORMS
       u[name] = gl.getUniformLocation(p, name);
     }
     return { p, u };
@@ -107,7 +111,7 @@ export async function mount(canvas, base) {
     gl.viewport(0, 0, W(), H());
     gl.clearColor(0.13, 0.17, 0.23, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    for (const [{ p, u }, vao] of [[landP, landVao], [quakeP, quakeVao]]) {
+    for (const [{ p, u }, vao] of [[landP, landVao], [quakeP, quakeVao]] as const) {
       gl.useProgram(p);
       gl.bindVertexArray(vao);
       gl.uniform3f(u.u_cam, state.x, state.y, state.zoom * W());
@@ -130,19 +134,19 @@ export async function mount(canvas, base) {
   const render = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; draw(); }); } };
 
   // Mouse: drag pans, wheel zooms about the cursor.
-  const dev = (e) => {
+  const dev = (e: MouseEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
     return [(e.clientX - r.left) * devicePixelRatio, (e.clientY - r.top) * devicePixelRatio];
   };
-  const toWorld = ([sx, sy]) => [state.x + (sx - W() / 2) / (state.zoom * W()), state.y + (sy - H() / 2) / (state.zoom * W() * AY)];
-  let drag = null;
+  const toWorld = ([sx, sy]: [number, number]): [number, number] => [state.x + (sx - W() / 2) / (state.zoom * W()), state.y + (sy - H() / 2) / (state.zoom * W() * Number(AY))];
+  let drag: [number, number] | null = null;
   canvas.addEventListener('pointerdown', (e) => { drag = dev(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointerup', () => { drag = null; });
   canvas.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const p = dev(e);
     state.x -= (p[0] - drag[0]) / (state.zoom * W());
-    state.y -= (p[1] - drag[1]) / (state.zoom * W() * AY);
+    state.y -= (p[1] - drag[1]) / (state.zoom * W() * Number(AY));
     drag = p;
     render();
   });

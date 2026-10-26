@@ -8,15 +8,25 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { source } from '../../tools/sources.ts';
 import { equalEarth, simplify, triangulatePolygon, polygonsOf } from '../../tools/geo.ts';
+import type { Point } from '../../tools/geo.ts';
+
+// The parts of the two GeoJSON sources this bake reads.
+interface Countries { features: { geometry: { type: string; coordinates: unknown } | null }[] }
+interface Quakes {
+  features: {
+    geometry: { coordinates: [number, number, number] };   // lon, lat, depth km
+    properties: { type: string; time: number; mag: number; place: string };
+  }[];
+}
 
 const OUT = 'data/baked/03-quake-timeline';
 const X = 2.7066, Y = 1.3174;
 const TOL = (2 * X) / (1280 * 8) * 1.5;   // 1.5 px at 8x zoom on a 1280 px window
 const T0 = Date.UTC(2025, 0, 1);
-const q = ([x, y]) => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
+const q = ([x, y]: Point): [number, number] => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
 
-const verts = [], idx = [];
-for (const f of JSON.parse(readFileSync(source('ne-countries'), 'utf8')).features) {
+const verts: number[] = [], idx: number[] = [];
+for (const f of (JSON.parse(readFileSync(source('ne-countries'), 'utf8')) as Countries).features) {
   for (const poly of polygonsOf(f.geometry)) {
     const rings = poly.map((r) => simplify(r.map(equalEarth), TOL).map(q)).filter((r) => r.length >= 4);
     if (!rings.length) continue;
@@ -28,7 +38,7 @@ for (const f of JSON.parse(readFileSync(source('ne-countries'), 'utf8')).feature
 }
 const land = Buffer.concat([Uint32Array.of(verts.length / 2, idx.length), Uint16Array.from(verts), Uint32Array.from(idx)].map((a) => Buffer.from(a.buffer)));
 
-const events = JSON.parse(readFileSync(source('usgs-quakes-2025'), 'utf8')).features
+const events = (JSON.parse(readFileSync(source('usgs-quakes-2025'), 'utf8')) as Quakes).features
   .filter((f) => f.properties.type === 'earthquake')
   .sort((a, b) => a.properties.time - b.properties.time);
 const rec = Buffer.alloc(events.length * 12);

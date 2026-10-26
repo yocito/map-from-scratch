@@ -37,7 +37,7 @@ benchmarks:
       metrics: [pick_ms]
 
 datasets:
-  bake: [sh, -c, node baselines/b02-maplibre/bake.mjs && mkdir -p .cache/baselines && cd .cache/baselines && npm install --no-audit --no-fund --silent maplibre-gl@5.24.0]
+  bake: [sh, -c, node baselines/b02-maplibre/bake.ts && mkdir -p .cache/baselines && cd .cache/baselines && npm install --no-audit --no-fund --silent maplibre-gl@5.24.0]
   sources:
     - id: ne-countries
       origin: Natural Earth 10m Admin 0 countries v5.1.1
@@ -49,7 +49,7 @@ datasets:
 performance_knowledge:
   - id: general-engine-costs
     finding: 汎用エンジンは、同じ依頼でも配るコード、初回描画、1 フレームの JS 時間、メモリで大きく上回る
-    evidence: code gzip 286 KB (02 は 3.4 KB)、first_frame p50 1,144 ms (227 ms)、cpu_ms p50 1.9 ms (0.005 ms)、JS ヒープ 37 MB (1.1 MB)
+    evidence: code gzip 279 KB (02 は 3.2 KB)、first_frame p50 770 ms (159 ms)、cpu_ms p50 1.1 ms (0.005 ms)、JS ヒープ 51 MB (1.1 MB)。同じときに測定
     applies_when: 専用の描画器を作る価値を数字で示すとき
   - id: worker-fetch-not-in-transfer
     finding: MapLibre は GeoJSON をワーカーの中で取得するので、ハーネスの transfer_kb に入らない

@@ -40,7 +40,7 @@ benchmarks:
       metrics: [elf_text_bytes, elf_rodata_bytes, elf_ram_bytes, strip_buffer_bytes]
 
 datasets:
-  bake: [node, examples/06-mcu-roadmap/bake.mjs]
+  bake: [node, examples/06-mcu-roadmap/bake.ts]
   sources:
     - id: osm-tokyo23
       origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点。highway=* の way

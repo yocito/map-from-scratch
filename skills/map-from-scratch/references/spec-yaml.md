@@ -94,7 +94,7 @@ Where the data comes from and what the renderer receives.
 
 Raw sources live in `tools/sources.ts` (converted once to `data/raw/`,
 again when their settings change). Processing specific to one example
-(dissolving countries, clipping) belongs in its `bake.mjs`.
+(dissolving countries, clipping) belongs in its `bake.ts`.
 
 ## performance_knowledge
 

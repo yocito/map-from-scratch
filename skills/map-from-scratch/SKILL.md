@@ -33,7 +33,7 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
   may appear only under `baselines/`, to measure against.
 - Do the work at bake time, not at run time: projection, simplification,
   triangulation, draw order, quantisation and compression all happen in
-  `bake.mjs`. The renderer receives data laid out for exactly what it draws.
+  `bake.ts`. The renderer receives data laid out for exactly what it draws.
 - Every requirement becomes a budget in `spec.yaml`, or says why it is not
   measured. The harness refuses a definition that leaves one out.
 - Every bench has functional checks, defined in `spec.yaml` and reported by
@@ -73,10 +73,12 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    comment which engine's approach you took or rejected and why.
 4. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
    `spec.yaml`, `REQUEST.md` (the narrative: design and what was learnt),
-   `bake.mjs`, the renderer, and for browser examples `index.html` plus a
-   `bench.js` loaded only under `?bench` (07 does this; earlier examples keep
-   the bench in `index.html`). Count in `chosen.code` exactly what a user
-   downloads. Shared bake helpers are in `tools/` (`sources.ts` for raw data,
+   `bake.ts`, the renderer, and for browser examples `index.html` that loads
+   `main.ts`, plus a `bench.ts` that `main.ts` imports only under `?bench`.
+   Everything is TypeScript: Node runs it directly, the static server strips
+   the types for the browser, and `bin/mfs test` type-checks it with tsc
+   (strict, erasable syntax only, `.ts` import specifiers). Count in
+   `chosen.code` exactly what a user downloads. Shared bake helpers are in `tools/` (`sources.ts` for raw data,
    converted again when its settings change; `geo.ts` for projections,
    simplification, triangulation, clipping); add to them with tests.
 5. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)

@@ -191,7 +191,9 @@ async function main(argv: string[]): Promise<number> {
     }
     case 'test': {
       // Unit tests, then type checks of the Node side and the browser side.
-      const tests = ['harness/test', 'tools/test'].flatMap((d) =>
+      // kits/<name>/*.test.ts: the from-scratch readers that renderers copy from.
+      const kitDirs = existsSync(join(root, 'kits')) ? readdirSync(join(root, 'kits')).map((k) => `kits/${k}`) : [];
+      const tests = ['harness/test', 'tools/test', ...kitDirs].filter((d) => existsSync(join(root, d))).flatMap((d) =>
         readdirSync(join(root, d)).filter((f) => f.endsWith('.test.ts')).map((f) => join(root, d, f)));
       const steps: [string, string[]][] = [
         [process.execPath, ['--test', ...tests]],

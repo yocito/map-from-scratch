@@ -2,10 +2,11 @@
 // a visitor downloads.
 import { emit, glRenderer, benchFrames, zoomPath } from '../../harness/page/bench.ts';
 import { equalEarth } from '../../tools/geo.ts';
+import type { CityMap } from './cities.ts';
 
-// mounted: performance.now() right after mount() resolved, taken in index.html
+// mounted: performance.now() right after mount() resolved, taken in main.ts
 // before this file was imported, so the import is not counted as start-up.
-export async function run(map, tip, mounted) {
+export async function run(map: CityMap, tip: HTMLElement, mounted: number): Promise<void> {
   const { gl, cam, n, pos, rad } = map;
   const AY = 1.3174 / 2.7066;
   const W = gl.canvas.width, H = gl.canvas.height, dpr = devicePixelRatio;
@@ -16,12 +17,12 @@ export async function run(map, tip, mounted) {
   emit({ metric: 'first_frame_ms', value: mounted + performance.now() - t });
   emit({ info: { gpu: glRenderer(gl), cities: n, land_vertices: map.landVertices, fan_triangles: map.fanTriangles, canvas: [W, H] } });
 
-  const world = (lon, lat) => {
+  const world = (lon: number, lat: number): [number, number] => {
     const [x, y] = equalEarth([lon, lat]);
     return [(x + 2.7066) / (2 * 2.7066), (1.3174 - y) / (2 * 1.3174)];
   };
-  const screen = (wx, wy) => [(wx - cam.x) * cam.zoom * W + W / 2, (wy - cam.y) * cam.zoom * W * AY + H / 2];
-  const set = (x, y, zoom) => { cam.x = x; cam.y = y; cam.zoom = zoom; };
+  const screen = (wx: number, wy: number): [number, number] => [(wx - cam.x) * cam.zoom * W + W / 2, (wy - cam.y) * cam.zoom * W * AY + H / 2];
+  const set = (x: number, y: number, zoom: number) => { cam.x = x; cam.y = y; cam.zoom = zoom; };
 
   // Camera path: whole world into Europe (the densest cluster) at 32x and back.
   const [ex, ey] = world(10, 50);
@@ -38,7 +39,7 @@ export async function run(map, tip, mounted) {
   map.draw();
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const hov = [];
+  const hov: number[] = [];
   let hits = 0;
   for (let i = 0; i < 500; i++) {
     const t0 = performance.now();
@@ -52,7 +53,7 @@ export async function run(map, tip, mounted) {
 
   // Every city must be hoverable: centred at 32x, the city under its own
   // centre must be itself. Also count how many already are at 1x.
-  const reach = (zoom) => {
+  const reach = (zoom: number): number => {
     let ok = 0;
     for (let i = 0; i < n; i++) {
       set(pos[2 * i] / 65535, pos[2 * i + 1] / 65535, zoom);
@@ -74,8 +75,8 @@ export async function run(map, tip, mounted) {
   map.draw();
   const px = new Uint8Array(W * H * 4);
   gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  const at = (sx, sy) => { const o = ((H - 1 - Math.floor(sy)) * W + Math.floor(sx)) * 4; return [px[o], px[o + 1], px[o + 2]]; };
-  const near = (c, want) => c.every((v, k) => Math.abs(v - want[k]) <= 3);
+  const at = (sx: number, sy: number): number[] => { const o = ((H - 1 - Math.floor(sy)) * W + Math.floor(sx)) * 4; return [px[o], px[o + 1], px[o + 2]]; };
+  const near = (c: number[], want: number[]): boolean => c.every((v, k) => Math.abs(v - want[k]) <= 3);
   const LAND = [222, 219, 209], SEA = [204, 224, 237];
   let drawn = 0, orange = 0;
   for (let i = 0; i < n; i++) {
@@ -93,8 +94,9 @@ export async function run(map, tip, mounted) {
   // 2. A real pointermove over Tokyo (at 8x, where it is the top city under
   //    its centre) shows its name and population, and paints it in the
   //    highlight colour. One over the open Pacific shows nothing.
-  const tokyo = Array.from({ length: n }, (_, i) => i).find((i) => map.city(i).name === '東京都');
-  const move = (sx, sy) => gl.canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: sx / dpr, clientY: sy / dpr, bubbles: true }));
+  // The bake always includes Tokyo: its population is the radius scale's POP_MAX.
+  const tokyo = Array.from({ length: n }, (_, i) => i).find((i) => map.city(i).name === '東京都')!;
+  const move = (sx: number, sy: number) => gl.canvas.dispatchEvent(new PointerEvent('pointermove', { clientX: sx / dpr, clientY: sy / dpr, bubbles: true }));
   const [tx, ty] = [pos[2 * tokyo] / 65535, pos[2 * tokyo + 1] / 65535];
   set(tx, ty, 8);
   move(W / 2, H / 2);

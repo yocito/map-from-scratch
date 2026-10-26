@@ -7,9 +7,14 @@ import { equalEarth, simplify, polygonsOf } from '../../tools/geo.ts';
 
 const OUT = 'data/baked/b02-maplibre';
 const X = 2.7066;
-const TOL = (2 * X) / (390 * 3 * 32) * 1.5;   // as in examples/02-world-population-mobile/bake.mjs
+const TOL = (2 * X) / (390 * 3 * 32) * 1.5;   // as in examples/02-world-population-mobile/bake.ts
 
-const fc = JSON.parse(readFileSync(source('ne-countries'), 'utf8'));
+interface NeCountry {
+  properties: { ADM0_A3: string; NAME: string; NAME_JA?: string | null; POP_EST: number };
+  geometry: { type: string; coordinates: unknown } | null;
+}
+
+const fc: { features: NeCountry[] } = JSON.parse(readFileSync(source('ne-countries'), 'utf8'));
 let points = 0;
 const features = fc.features.map((f) => {
   const polys = polygonsOf(f.geometry).map((poly) => poly

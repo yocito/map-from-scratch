@@ -19,21 +19,31 @@ import { existsSync } from 'node:fs';
 import { source } from '../../tools/sources.ts';
 import { equalEarth, simplify, polygonsOf } from '../../tools/geo.ts';
 
+// The fields of the Natural Earth files this bake reads.
+interface LandCollection { features: { geometry: Parameters<typeof polygonsOf>[0] }[] }
+interface CountryCollection { features: { properties: { ADM0_A3: string; NAME_JA: string | null } }[] }
+interface PlaceCollection {
+  features: {
+    properties: { ADM0_A3: string; ADM0NAME: string; POP_MAX: number; NAME: string; NAME_JA: string | null };
+    geometry: { coordinates: [number, number] };
+  }[];
+}
+
 const OUT = 'data/baked/07-world-cities-hover';
 const X = 2.7066, Y = 1.3174;
 // Land is a backdrop: 1.5 px at 4x zoom on a 1280 px wide window (DPR 1).
 // Deeper zooms show coarser coasts; the cities stay exact.
 const LAND_TOL = (2 * X) / (1280 * 4) * 1.5;
-const q = ([x, y]) => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
-const delta16 = (a) => a.map((v, i) => (v - (i ? a[i - 1] : 0)) & 0xffff);
-const gz = (b) => gzipSync(b, { level: 9 }).length;
-const bytes = (...arrays) => Buffer.concat(arrays.map((a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength)));
+const q = ([x, y]: number[]): [number, number] => [Math.round(((x + X) / (2 * X)) * 65535), Math.round(((Y - y) / (2 * Y)) * 65535)];
+const delta16 = (a: number[]): number[] => a.map((v, i) => (v - (i ? a[i - 1] : 0)) & 0xffff);
+const gz = (b: Uint8Array): number => gzipSync(b, { level: 9 }).length;
+const bytes = (...arrays: ArrayBufferView[]): Buffer => Buffer.concat(arrays.map((a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength)));
 
 // Symbol radius in CSS px: area proportional to population, Tokyo (35.7 M)
 // gets R_MAX. Stored as radius * 10 in a byte. Places without a population
 // (POP_MAX <= 0) get the minimum.
 export const R_MAX = 18, R_MIN = 1.5, POP_MAX = 35676000;
-const radius10 = (pop) => Math.round(10 * Math.max(R_MIN, R_MAX * Math.sqrt(Math.max(0, pop) / POP_MAX)));
+const radius10 = (pop: number): number => Math.round(10 * Math.max(R_MIN, R_MAX * Math.sqrt(Math.max(0, pop) / POP_MAX)));
 
 // --- land
 // Countries dissolved into land first: shared borders would otherwise be
@@ -44,8 +54,8 @@ if (!existsSync(landSrc)) {
   execFileSync('ogr2ogr', ['-f', 'GeoJSON', landSrc, source('ne-countries'), '-dialect', 'sqlite', '-sql',
     'SELECT ST_Union(ST_MakeValid(geometry)) AS geometry FROM ne_10m_admin_0_countries'], { stdio: 'inherit' });
 }
-const lx = [], ly = [], lens = [];
-for (const f of JSON.parse(readFileSync(landSrc, 'utf8')).features) {
+const lx: number[] = [], ly: number[] = [], lens: number[] = [];
+for (const f of (JSON.parse(readFileSync(landSrc, 'utf8')) as LandCollection).features) {
   for (const poly of polygonsOf(f.geometry)) {
     for (const r of poly) {
       let g = simplify(r.map(equalEarth), LAND_TOL).map(q);
@@ -62,14 +72,14 @@ const land = bytes(Uint32Array.of(lx.length, lens.length), Uint16Array.from(delt
   ...(lx.length % 2 ? [new Uint16Array(1)] : []), Uint32Array.from(lens));
 
 // --- cities
-const countries = JSON.parse(readFileSync(source('ne-countries'), 'utf8')).features;
-const jaCountry = new Map(countries.map((f) => [f.properties.ADM0_A3, f.properties.NAME_JA]));
+const countries = (JSON.parse(readFileSync(source('ne-countries'), 'utf8')) as CountryCollection).features;
+const jaCountry = new Map<string, string | null>(countries.map((f) => [f.properties.ADM0_A3, f.properties.NAME_JA]));
 // Codes the admin-0 layer does not have.
 Object.entries({ SSD: '南スーダン', SJM: 'スヴァールバル諸島およびヤンマイエン島', TKL: 'トケラウ' })
   .forEach(([k, v]) => jaCountry.set(k, v));
-const places = JSON.parse(readFileSync(source('ne-populated-places'), 'utf8')).features;
-const cnames = [], cindex = new Map();
-const morton = (x, y) => {
+const places = (JSON.parse(readFileSync(source('ne-populated-places'), 'utf8')) as PlaceCollection).features;
+const cnames: string[] = [], cindex = new Map<string, number>();
+const morton = (x: number, y: number): bigint => {
   let m = 0n;
   for (let b = 15; b >= 0; b--) m = (m << 2n) | BigInt(((y >> b) & 1) << 1 | ((x >> b) & 1));
   return m;
@@ -79,13 +89,14 @@ const cities = places.map((f) => {
   const country = jaCountry.get(p.ADM0_A3) ?? p.ADM0NAME;
   if (!cindex.has(country)) { cindex.set(country, cnames.length); cnames.push(country); }
   const [x, y] = q(equalEarth(f.geometry.coordinates));
-  return { x, y, m: morton(x, y), r: radius10(p.POP_MAX), c: cindex.get(country), pop: Math.max(0, p.POP_MAX), name: p.NAME_JA || p.NAME };
+  return { x, y, m: morton(x, y), r: radius10(p.POP_MAX), c: cindex.get(country)!, pop: Math.max(0, p.POP_MAX), name: p.NAME_JA || p.NAME };
 });
 if (cnames.length > 256) throw new Error(`${cnames.length} countries do not fit a byte`);
 cities.sort((a, b) => b.r - a.r || (a.m < b.m ? -1 : a.m > b.m ? 1 : 0));
 
 const n = cities.length;
-const col = (k) => cities.map((c) => c[k]);
+type City = (typeof cities)[number];
+const col = <K extends keyof City>(k: K): City[K][] => cities.map((c) => c[k]);
 const cityBin = bytes(Uint32Array.of(n), Uint16Array.from(delta16(col('x'))), Uint16Array.from(delta16(col('y'))),
   Uint8Array.from(col('r')), Uint8Array.from(col('c')), ...(n % 2 ? [new Uint16Array(1)] : []), Uint32Array.from(col('pop')));
 const text = `${cnames.join('\n')}\n\n${col('name').join('\n')}`;

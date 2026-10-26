@@ -14,6 +14,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["examples/*/*.ts", "baselines/*/*.ts", "harness/page/*.ts", "harness/probe/*.ts", "tools/geo.ts", "vendor/earcut/*.d.ts"],
-  "exclude": ["examples/*/bake.ts", "baselines/*/bake.ts"]
+  "include": ["kits/**/*.ts", "examples/*/*.ts", "baselines/*/*.ts", "harness/page/*.ts", "harness/probe/*.ts", "tools/geo.ts", "vendor/earcut/*.d.ts"],
+  "exclude": ["examples/*/bake.ts", "baselines/*/bake.ts", "kits/**/*.test.ts"]
 }

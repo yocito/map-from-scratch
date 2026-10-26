@@ -42,7 +42,12 @@ void main() {
   o = vec4(col, 1.0);
 }`;
 
-export async function mount(canvas, url) {
+// One level of the float targets: the count, or a step of the max pyramid.
+interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number }
+
+export type DensityMap = Awaited<ReturnType<typeof mount>>;
+
+export async function mount(canvas: HTMLCanvasElement, url: string) {
   const bin = await fetch(url).then((r) => r.arrayBuffer());
   const n = new Uint32Array(bin, 0, 1)[0];
   const bbox = new Float64Array(bin, 8, 4);
@@ -63,22 +68,25 @@ export async function mount(canvas, url) {
     pos[2 * j + 1] = y;
   }
 
-  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
+  const ctx = canvas.getContext('webgl2', { antialias: false, alpha: false });
+  if (!ctx) throw new Error('WebGL2 unavailable');
+  const gl = ctx;   // narrowed once, for resize() and draw() below as well
   for (const e of ['EXT_color_buffer_float', 'EXT_float_blend']) if (!gl.getExtension(e)) throw new Error(`${e} unavailable`);
-  const program = (vs, fs) => {
+  const program = (vs: string, fs: string): WebGLProgram => {
     const p = gl.createProgram();
-    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]] as const) {
       const s = gl.createShader(t);
+      if (!s) throw new Error('createShader failed');
       gl.shaderSource(s, src);
       gl.compileShader(s);
       gl.attachShader(p, s);
     }
     gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? 'link failed');
     return p;
   };
   const pointP = program(POINT_VS, POINT_FS), maxP = program(FULL_VS, MAX_FS), colorP = program(FULL_VS, COLOR_FS);
-  const uni = (p, name) => gl.getUniformLocation(p, name);
+  const uni = (p: WebGLProgram, name: string) => gl.getUniformLocation(p, name);
 
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -89,8 +97,8 @@ export async function mount(canvas, url) {
   const empty = gl.createVertexArray();
 
   // Float targets: the count at full size, then the max pyramid down to 1x1.
-  let levels = [];
-  const target = (w, h) => {
+  let levels: Target[] = [];
+  const target = (w: number, h: number): Target => {
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texStorage2D(gl.TEXTURE_2D, 1, gl.R32F, w, h);
@@ -156,12 +164,12 @@ export async function mount(canvas, url) {
 
   let pending = false;
   const render = () => { if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; draw(); }); } };
-  const dev = (e) => {
+  const dev = (e: MouseEvent): [number, number] => {
     const r = canvas.getBoundingClientRect();
     return [(e.clientX - r.left) * devicePixelRatio, (e.clientY - r.top) * devicePixelRatio];
   };
-  const toGrid = ([sx, sy]) => [cam.x + (sx - canvas.width / 2) / scale(), cam.y + (sy - canvas.height / 2) / scale()];
-  let drag = null;
+  const toGrid = ([sx, sy]: [number, number]): [number, number] => [cam.x + (sx - canvas.width / 2) / scale(), cam.y + (sy - canvas.height / 2) / scale()];
+  let drag: [number, number] | null = null;
   canvas.addEventListener('pointerdown', (e) => { drag = dev(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointerup', () => { drag = null; });
   canvas.addEventListener('pointermove', (e) => {

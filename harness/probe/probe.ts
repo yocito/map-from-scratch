@@ -29,5 +29,11 @@ if (gl) {
   await new Promise((r) => setTimeout(r, 1000));
   info.canvas2d_alive_after_1s = !c2.isContextLost();
 }
+// Which formats the browser can decompress natively (DecompressionStream):
+// a renderer that reads gzip or zstd pages over HTTP Range needs no decoder
+// of its own when the format is here.
+info.decompression = ['gzip', 'deflate', 'deflate-raw', 'zstd', 'br', 'brotli'].filter((f) => {
+  try { new DecompressionStream(f as CompressionFormat); return true; } catch { return false; }
+}).join(',');
 emit({ info });
 emit({ done: true });

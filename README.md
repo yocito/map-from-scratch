@@ -26,37 +26,38 @@
 
 ## 計測結果
 
-`bin/mfs report` の出力です (RTX 3060、Ryzen 9 5950X、Chromium 156 headless、2026-10-26)。
+`bin/mfs report` の出力です (RTX 3060、Ryzen 9 5950X、Chromium 156 headless、2026-10-26、load average 2 前後の静かなときに全部を続けて測定)。
 
 | 例 | 実行環境 | 配るコード | データ | 初回描画 p50 | フレーム p95 | 予算 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01-prefecture-picker | Canvas 2D | 1150 B gzip | 3936 B gzip | 90.8 ms | 1.48 ms | 全部通過 6/6 |
-| 02-world-population-mobile | WebGL2 | 3449 B gzip | 463 KB gzip | 227 ms | 1.28 ms | 全部通過 5/5 |
-| 03-quake-timeline | WebGL2 | 2601 B gzip | 513 KB gzip | 63.8 ms | 1.13 ms | 全部通過 5/5 |
-| 04-osm-node-density | WebGL2 | 3086 B gzip | 17135 KB gzip | 275 ms | 2.38 ms | 全部通過 5/5 |
-| 05-tokyo-roads-native | C + EGL/GLES3 | 23 KB (実行ファイル) | 5357 KB gzip | 106 ms | 1.08 ms | 全部通過 5/5 |
-| 06-mcu-roadmap | C (MCU) | 988 B (.text) | 469 KB (.rodata) | - | 0.376 ms | 全部通過 6/6 |
-| 07-world-cities-hover | WebGL2 | 4504 B gzip | 129 KB gzip | 184 ms | 3.27 ms | 全部通過 7/7 |
+| 01-prefecture-picker | Canvas 2D | 962 B gzip | 3936 B gzip | 89.4 ms | 1.42 ms | 全部通過 6/6 |
+| 02-world-population-mobile | WebGL2 | 3254 B gzip | 463 KB gzip | 159 ms | 1.27 ms | 全部通過 5/5 |
+| 03-quake-timeline | WebGL2 | 2646 B gzip | 513 KB gzip | 37 ms | 1.11 ms | 全部通過 5/5 |
+| 04-osm-node-density | WebGL2 | 2730 B gzip | 17135 KB gzip | 275 ms | 2.34 ms | 全部通過 5/5 |
+| 05-tokyo-roads-native | EGL + OpenGL ES 3.0 | 23 KB (実行ファイル) | 5357 KB gzip | 116 ms | 1.14 ms | 全部通過 5/5 |
+| 06-mcu-roadmap | C (MCU) | 988 B (.text) | 469 KB (.rodata) | - | 0.372 ms | 全部通過 6/6 |
+| 07-world-cities-hover | WebGL2 | 4220 B gzip | 129 KB gzip | 63.7 ms | 2.48 ms | 全部通過 7/7 |
 
 - フレームの列は、WebGL2 とネイティブでは GPU の処理が終わるまで待った 1 フレームの時間です。01 はホバー中の rAF フレーム間隔、06 はホスト CPU での時間で、マイコン実機の時間ではありません。
 - 01 と 02 はスマホ相当 (390×844、DPR 3、CPU 4 倍スロットル) で測っています。
-- 07 は別の処理で機械が混んでいたとき (load average 60 以上) に測りました。混んでいると時間の値は 1.5〜2 倍になり、GPU 時間はほとんど変わりません。
+- 配るコードは、TypeScript から型を除いた JavaScript (ブラウザが受け取るもの) の gzip 後の大きさです。
+- 初回描画には、計測用のコードの読み込みを含めていません。
 - この表のほかに、各例の検証の項目 (verification) もすべての反復で通っています。
 
 ### 汎用エンジンとの比較
 
-02 と同じ依頼を MapLibre GL JS 5.24.0 で作り ([baselines/b02-maplibre](baselines/b02-maplibre))、同じジオメトリ、同じ画面、同じカメラ経路で測りました。
+02 と同じ依頼を MapLibre GL JS 5.24.0 で作り ([baselines/b02-maplibre](baselines/b02-maplibre))、同じジオメトリ、同じ画面、同じカメラ経路で、上の表と同じときに測りました。
 
 | | 02 (この方式) | MapLibre GL JS | 差 |
 | --- | --- | --- | --- |
-| 配るコード (gzip) | 3.4 KB | 286 KB | 83 分の 1 |
-| データ (gzip) | 463 KB | 1,178 KB (GeoJSON) | 2.5 分の 1 |
-| 初回描画 p50 | 227 ms | 1,144 ms | 5 分の 1 |
-| フレーム p95 (GPU の処理の終わりまで) | 1.28 ms | 5.2 ms (タイル生成後) / 6.9 ms (生成中) | 4〜5 分の 1 |
-| 1 フレームの JS 時間 p50 | 0.005 ms | 1.9 ms | |
-| 新しいズームでの描き直し待ち | なし | 33〜56 ms | |
-| タップの当たり判定 p95 | 0.9 ms | 2.8 ms | |
-| JS ヒープ | 1.1 MB | 37 MB | 34 分の 1 |
+| 配るコード (gzip) | 3.2 KB | 279 KB | 88 分の 1 |
+| データ (gzip) | 463 KB | 1,153 KB (GeoJSON) | 2.5 分の 1 |
+| 初回描画 p50 | 159 ms | 770 ms (最初に idle になるまで) | 4.8 分の 1 |
+| フレーム p95 (GPU の処理の終わりまで) | 1.27 ms | 2.88 ms (タイル生成後) / 3.84 ms (生成中) | 2.3〜3 分の 1 |
+| 1 フレームの JS 時間 p50 | 0.005 ms | 1.1 ms | |
+| 新しいズームでの描き直し待ち | なし | 1〜30 ms | |
+| タップの当たり判定 p95 | 0.85 ms | 1.6 ms | |
+| JS ヒープ | 1.1 MB | 51 MB | 46 分の 1 |
 
 MapLibre は Web メルカトルで描くので、投影法は 02 (Equal Earth) と違います。
 

@@ -39,7 +39,7 @@ benchmarks:
       metrics: [cpu_ms, frame_ms, gpu_ms]
 
 datasets:
-  bake: [node, examples/03-quake-timeline/bake.mjs]
+  bake: [node, examples/03-quake-timeline/bake.ts]
   sources:
     - id: usgs-quakes-2025
       origin: USGS ComCat、2025 年、M4.5 以上、earthquake のみ (8,502 件)
@@ -70,9 +70,9 @@ architecture_selection:
   chosen:
     platform: browser
     api: WebGL2
-    language: JavaScript (ES modules、ビルドなし)
+    language: TypeScript (ブラウザには型を除いた ES modules を配る。ビルドなし)
     gpu: hardware
-    code: [examples/03-quake-timeline/quake.js]
+    code: [examples/03-quake-timeline/quake.ts]
     dependencies: []
     why: 時刻ごとの見え方 (波紋、薄れ方) を頂点シェーダで計算すれば、CPU は何もしなくてよい
   alternatives:
