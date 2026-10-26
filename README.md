@@ -28,8 +28,9 @@
 | [10-gsi-seamlessphoto](examples/10-gsi-seamlessphoto/REQUEST.md) | z.yuiseki.net のシームレス空中写真を Range で読み、移動・拡大して見る | Canvas 2D |
 | [16-plateau-buildings-3d](examples/16-plateau-buildings-3d/spec.yaml) | 東京駅周辺の PLATEAU 建物を 3D で回して見る | WebGL2 |
 | [17-fuji-terrain-3d](examples/17-fuji-terrain-3d/REQUEST.md) | 富士山周辺の地形を 3D で回して見る | WebGL2 |
+| [18-fuji-aerial-terrain](examples/18-fuji-aerial-terrain/REQUEST.md) | 富士山の 3D 地形にシームレス空中写真を重ねる | WebGL2 |
 
-各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10 と 18 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
 サイトのカードにはブラウザ用の例に加え、デスクトップ用・マイコン用の例へのソースリンクも掲載します。
 Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 

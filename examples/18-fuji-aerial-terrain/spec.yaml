@@ -1,0 +1,47 @@
+id: 18-fuji-aerial-terrain
+request: 富士山の 3D 地形に、地理院のシームレス空中写真をテクスチャとして重ねて眺めたい。
+requirements:
+  - id: textured-terrain
+    need: 富士山の地形の上に空中写真が位置を合わせて載る
+    unmeasured: 地形と写真は同じ z12 XYZ 格子を使う。表示の自動検証は未実施。
+  - id: orbit
+    need: 斜めから回転・拡大して眺められる
+    unmeasured: 17 のカメラと LOD を引き継ぐ。操作の自動検証は未実施。
+  - id: no-photo-copy
+    need: 写真の巨大な PMTiles を GitHub Pages に複製しない
+    unmeasured: 写真36枚を z.yuiseki.net から Range で読む。通信量の計測は未実施。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/18-fuji-aerial-terrain/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  sources:
+    - id: mapterhorn-fuji
+      origin: 17 の Mapterhorn 標高から生成した fuji.terr
+      license: Mapterhorn と国土地理院の出典・加工表示、測量法に基づく国土地理院長承認（使用）R 8JHs 131
+    - id: gsi-seamlessphoto-mirror
+      origin: https://z.yuiseki.net/static/gsi/seamlessphoto/seamlessphoto512.pmtiles
+      license: 国土地理院コンテンツ利用規約。第三者の画像も含むため、地理院タイル一覧と利用上の注意を参照。
+  outputs: [data/baked/17-fuji-terrain-3d/fuji.terr]
+  preparation:
+    - 地形のヘッダーの x0・y0 は z12 の 512px タイル座標。富士山周辺で x3624～3629、y1614～1619。
+    - 写真の同じ z12 の 6×6 枚を Range 取得し、ブラウザの 3072×3072 WebGL テクスチャへ配置する。
+    - 地形頂点の z12 画素位置を写真テクスチャの UV にする。写真が揃うまでは標高色を描く。
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2、Fetch Range、DecompressionStream
+    language: TypeScript
+    gpu: hardware
+    code: [examples/18-fuji-aerial-terrain/index.html, examples/18-fuji-aerial-terrain/main.ts, examples/18-fuji-aerial-terrain/gl.ts, examples/18-fuji-aerial-terrain/terrain.ts, examples/18-fuji-aerial-terrain/views.ts, examples/18-fuji-aerial-terrain/pmtiles.ts]
+    dependencies: []
+    why: 17 の地形メッシュに z12 写真の UV を追加すれば、別の地図エンジンや追加のデータ変換が要らない。
+  alternatives: []
+  not_doing: [写真の焼き直し, 写真の GitHub Pages への再配布, 他地域, 建物, 地図上の文字]
+verification:
+  checks: []
