@@ -102,13 +102,17 @@ function indexPage(rows: { id: string; dir: string; spec: Spec }[]): string {
       numbers = `<p class="num">${esc(parts.join(' ・ '))}</p>`;
     }
     const tag = spec.baseline ? ' <span class="tag">比較用</span>' : '';
+    const runtimeTag = spec.runtime === 'native' ? ' <span class="tag">ソース・計測結果</span>' : '';
+    const href = spec.runtime === 'browser' ? `${esc(dir)}/` : `${REPO_URL}/tree/main/${esc(dir)}`;
+    const action = spec.runtime === 'browser' ? '操作する ↗' : '実装を見る ↗';
     const requestLink = existsSync(join(root, dir, 'REQUEST.md'))
       ? ` ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/REQUEST.md">設計と計測</a>`
       : '';
-    return `<li><a class="open" href="${esc(dir)}/">${esc(id)}</a>${tag}
+    return `<li><div class="card-head"><span class="id">${esc(id)}</span>${tag}${runtimeTag}</div>
   <p class="req">${esc(d.request)}</p>
-  <p class="how">${esc([chosen.api, chosen.language].filter(Boolean).join(' / '))}</p>${numbers}
-  <p class="links"><a href="${REPO_URL}/tree/main/${esc(dir)}">ソース</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/spec.yaml">spec.yaml</a>${requestLink}</p></li>`;
+  <p class="how">${esc([chosen.api, chosen.language].filter(Boolean).join(' / '))}</p>${numbers || '<p class="num">性能は未計測</p>'}
+  <p class="links"><a href="${REPO_URL}/tree/main/${esc(dir)}">ソース</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/spec.yaml">spec.yaml</a>${requestLink}</p>
+  <a class="open" href="${href}">${action}</a></li>`;
   }).join('\n');
   return `<!doctype html>
 <html lang="ja">
@@ -118,19 +122,25 @@ function indexPage(rows: { id: string; dir: string; spec: Spec }[]): string {
 <style>
   :root { --bg: #fafaf7; --fg: #1f2328; --muted: #59636e; --line: #d8dee4; --accent: #0b6e4f; }
   @media (prefers-color-scheme: dark) { :root { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #30363d; --accent: #3fb950; } }
-  body { margin: 0 auto; max-width: 860px; padding: 24px 16px 64px; background: var(--bg); color: var(--fg); font: 16px/1.7 system-ui, sans-serif; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .lead { color: var(--muted); margin: 0 0 24px; }
-  ul { list-style: none; padding: 0; margin: 0; }
-  li { border-top: 1px solid var(--line); padding: 16px 0; }
-  .open { font-weight: 600; font-size: 1.05rem; color: var(--accent); }
-  .req { margin: 6px 0; }
-  .how, .num, .links { margin: 2px 0; color: var(--muted); font-size: 0.9rem; }
-  .tag { font-size: 0.75rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; color: var(--muted); }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; max-width: 1200px; padding: 32px 20px 72px; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, sans-serif; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); margin: 0 0 6px; }
+  .lead { color: var(--muted); margin: 0 0 30px; max-width: 780px; }
+  ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px; }
+  li { min-width: 0; display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--bg) 88%, var(--fg)); box-shadow: 0 3px 14px #0000000b; }
+  li:hover { border-color: var(--accent); box-shadow: 0 8px 22px #00000018; }
+  .card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .id { font-size: 0.82rem; font-weight: 700; overflow-wrap: anywhere; }
+  .req { margin: 15px 0 12px; font-size: 1.05rem; font-weight: 600; }
+  .how, .num, .links { margin: 3px 0; color: var(--muted); font-size: 0.88rem; }
+  .links { margin-top: auto; padding-top: 14px; }
+  .open { display: inline-block; align-self: flex-start; margin-top: 14px; padding: 7px 12px; border-radius: 7px; background: var(--accent); color: white; font-weight: 700; text-decoration: none; }
+  .open:hover, .open:focus-visible { text-decoration: underline; }
+  .tag { font-size: 0.72rem; border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; color: var(--muted); }
   a { color: var(--accent); }
 </style>
 <h1>map-from-scratch</h1>
-<p class="lead">「X をしたいから地図を作って」という依頼ごとに、その目的だけの地図描画器をほぼゼロから作り、計測で確かめた例です。各例は実際に操作できます。数値はリポジトリのハーネスで測ったものです。 <a href="${REPO_URL}">GitHub</a></p>
+<p class="lead">「X をしたいから地図を作って」という依頼ごとに作った例です。ブラウザ用の例は操作できます。表示した性能値はリポジトリのハーネスで測ったものです。 <a href="${REPO_URL}">GitHub</a></p>
 <ul>
 ${items}
 </ul>
@@ -145,11 +155,12 @@ for (const base of ['examples', 'baselines']) {
     const dir = join(root, base, id);
     if (!existsSync(join(dir, 'spec.yaml'))) continue;
     const spec = loadSpec(dir);
-    if (spec.runtime !== 'browser') continue;
     if (!publishOnPages(spec.definition!)) continue;
-    copyPage(join(dir, 'index.html'));
-    for (const f of expandFiles(root, spec.footprint.code)) if (!f.endsWith('.ts') && !f.endsWith('.html')) copyFile(join(root, f));
-    for (const f of expandFiles(root, spec.footprint.data)) copyFile(join(root, f));
+    if (spec.runtime === 'browser') {
+      copyPage(join(dir, 'index.html'));
+      for (const f of expandFiles(root, spec.footprint.code)) if (!f.endsWith('.ts') && !f.endsWith('.html')) copyFile(join(root, f));
+      for (const f of expandFiles(root, spec.footprint.data)) copyFile(join(root, f));
+    }
     rows.push({ id, dir: `${base}/${id}`, spec });
   }
 }
@@ -158,4 +169,4 @@ writeFileSync(join(out, '.nojekyll'), '');   // serve dot directories (.cache) a
 let total = 0;
 const walk = (d: string): void => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else total += statSync(p).size; } };
 walk(out);
-console.log(`site: ${rows.length} pages, ${copied.size} files, ${(total / 2 ** 20).toFixed(1)} MB in ${relative(root, out)}`);
+console.log(`site: ${rows.length} cards, ${copied.size} files, ${(total / 2 ** 20).toFixed(1)} MB in ${relative(root, out)}`);

@@ -7,7 +7,7 @@
 - 言語、描画 API、ランタイムは依頼に合わせて選ぶ (Canvas 2D、WebGL2、C + EGL/GLES3、マイコン向けの C など)。
 - 外部ライブラリは使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
 - 各例を `spec.yaml` で定義する。要件 (requirements)、評価 (evaluation)、計測 (benchmarks)、データ (datasets)、性能の知見 (performance_knowledge)、構成の選択 (architecture_selection)、検証 (verification) の 7 節からなる。
-- 要件はすべて、測定値の上限や下限 (予算) にし、ハーネスが毎回測って合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。
+- 計測済みの例では要件を測定値の上限や下限 (予算) にし、ハーネスが合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。未計測の例はその旨を明記する。
 - 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 48) の解き方を読んで参考にする。
 
 ## 例
@@ -23,10 +23,13 @@
 | [05-tokyo-roads-native](examples/05-tokyo-roads-native/REQUEST.md) | ブラウザなしのデスクトップアプリで 23 区の全道路を 144 Hz で | C + EGL + OpenGL ES 3.0 |
 | [06-mcu-roadmap](examples/06-mcu-roadmap/REQUEST.md) | ESP32-C6 と 240×240 液晶で渋谷駅周辺の道路地図 (FPU なし) | C (freestanding、RISC-V) |
 | [07-world-cities-hover](examples/07-world-cities-hover/REQUEST.md) | 世界の都市 7,342 を人口の大きさの点で、マウスを乗せると名前と人口。ページ全体で gzip 150 KB 以内 | WebGL2 |
+| [08-prefecture-quiz](examples/08-prefecture-quiz/REQUEST.md) | 示された都道府県を地図で順に当てるクイズ | Canvas 2D |
+| [09-prefecture-search](examples/09-prefecture-search/REQUEST.md) | 県名を入力して地図上の位置を探す | Canvas 2D |
 | [16-plateau-buildings-3d](examples/16-plateau-buildings-3d/spec.yaml) | 東京駅周辺の PLATEAU 建物を 3D で回して見る | WebGL2 |
 | [17-fuji-terrain-3d](examples/17-fuji-terrain-3d/REQUEST.md) | 富士山周辺の地形を 3D で回して見る | WebGL2 |
 
-各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08 と 09 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+サイトのカードにはブラウザ用の例に加え、デスクトップ用・マイコン用の例へのソースリンクも掲載します。
 Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 
 ## 計測結果
