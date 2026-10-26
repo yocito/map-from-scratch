@@ -5,7 +5,7 @@ FROM node:24-trixie-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      ca-certificates \
+      ca-certificates curl \
       build-essential \
       rustc cargo \
       chromium \
@@ -16,6 +16,17 @@ RUN apt-get update \
       procps \
       fonts-noto-cjk \
  && rm -rf /var/lib/apt/lists/*
+
+# DuckDB CLI for bake steps that read Parquet or GeoPackage (bake time only,
+# never shipped). Extensions are installed into the image; the wrapper points
+# every session at them, so a run needs no network for them.
+RUN curl -fsSL -o /tmp/duckdb.gz https://github.com/duckdb/duckdb/releases/download/v1.5.5/duckdb_cli-linux-amd64.gz \
+ && gunzip -c /tmp/duckdb.gz > /usr/local/lib/duckdb-cli && chmod +x /usr/local/lib/duckdb-cli && rm /tmp/duckdb.gz \
+ && mkdir -p /opt/duckdb/extensions \
+ && /usr/local/lib/duckdb-cli -c "SET extension_directory='/opt/duckdb/extensions'; INSTALL spatial; INSTALL httpfs;" \
+ && chmod -R a+rX /opt/duckdb \
+ && printf '#!/bin/sh\nexec /usr/local/lib/duckdb-cli -cmd "SET extension_directory='"'"'/opt/duckdb/extensions'"'"'" "$@"\n' > /usr/local/bin/duckdb \
+ && chmod +x /usr/local/bin/duckdb
 
 # Type checking only (bin/mfs test runs tsc --noEmit). Nothing here ships:
 # Node runs .ts directly and the static server strips types for browsers.

@@ -26,6 +26,9 @@ export interface Viewport {
   mobile: boolean;
 }
 
+// Emulated network for a browser run (CDP Network.emulateNetworkConditions).
+export interface Network { name?: string; latencyMs: number; downloadKbps: number; uploadKbps: number }
+
 // Run settings the harness works from, whether they came from spec.yaml
 // (fromDefinition) or an old spec.json.
 export interface Spec {
@@ -36,7 +39,7 @@ export interface Spec {
   gpu: 'hardware' | 'none';
   bake?: string[];
   build?: string[];
-  run: { page?: string; viewport?: Viewport; cpuThrottle?: number; cmd?: string[] };
+  run: { page?: string; viewport?: Viewport; cpuThrottle?: number; network?: Network; cmd?: string[] };
   iterations: number;
   timeoutMs: number;
   footprint: { code: string[]; data: string[]; elf?: string[] };
@@ -61,6 +64,7 @@ export interface Definition {
     page?: string;
     viewport?: { width: number; height: number; device_scale_factor?: number; mobile?: boolean };
     cpu_throttle?: number;
+    network?: { name?: string; latency_ms: number; download_mbps: number; upload_mbps?: number };
     cmd?: string[];
     iterations?: number;
     timeout_ms?: number;

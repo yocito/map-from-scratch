@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { shippedSource } from './strip.ts';
@@ -15,6 +16,21 @@ export interface Footprint {
 // that gets installed) and the data it loads. spec.footprint lists the files,
 // relative to the repository root. Gzip sizes are per file, as a server would
 // send them. TypeScript is measured as the JavaScript a browser receives.
+// A listed directory stands for every file under it (tile sets split into
+// many files for HTTP serving).
+export function expandFiles(root: string, files: string[]): string[] {
+  const out: string[] = [];
+  const walk = (rel: string): void => {
+    const abs = join(root, rel);
+    if (statSync(abs).isDirectory()) for (const f of readdirSync(abs).sort()) walk(join(rel, f));
+    else out.push(rel);
+  };
+  for (const f of files) {
+    try { walk(f); } catch { throw new Error(`footprint file not found: ${f} (build/bake first?)`); }
+  }
+  return out;
+}
+
 export function measureFootprint(root: string, { code = [], data = [] }: { code?: string[]; data?: string[] }): Footprint {
   const read = (f: string): Buffer => {
     try {
@@ -24,8 +40,8 @@ export function measureFootprint(root: string, { code = [], data = [] }: { code?
     }
   };
   const gz = (bufs: Buffer[]) => bufs.reduce((a, b) => a + gzipSync(b, { level: 9 }).length, 0);
-  const codeBufs = code.map(read);
-  const dataBufs = data.map(read);
+  const codeBufs = expandFiles(root, code).map(read);
+  const dataBufs = expandFiles(root, data).map(read);
   return {
     code_bytes: codeBufs.reduce((a, b) => a + b.length, 0),
     code_gzip_bytes: gz(codeBufs),

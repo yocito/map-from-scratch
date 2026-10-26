@@ -3,7 +3,7 @@
 //   list                       examples and their requests
 //   bake  <id|all>             prepare data (spec.bake)
 //   build <id|all>             compile (spec.build)
-//   bench <id|all> [-n N]      measure and check budgets
+//   bench <id|all> [-n N] [--site]  measure and check budgets (--site: the built Pages site)
 //   report                     latest results of every example, as Markdown
 //   serve [port]               serve the repo for interactive use
 //   test                       harness unit tests
@@ -85,13 +85,16 @@ function fmt(x: number | null | undefined): string {
   return Number(x.toPrecision(4)).toString();
 }
 
-async function bench(id: string, iterations: number | undefined): Promise<boolean> {
+// site: run the page from the built GitHub Pages site (tools/build-site.ts)
+// instead of the repository, to check exactly what is published.
+async function bench(id: string, iterations: number | undefined, site?: string): Promise<boolean> {
   const spec = loadSpec(specDir(id));
   const outDir = join(root, 'results', id);
   mkdirSync(outDir, { recursive: true });
   const n = iterations ?? spec.iterations;
   const runner = spec.runtime === 'browser' ? benchBrowser : benchNative;
-  const raw = await runner(root, spec, outDir, { iterations: n });
+  if (site && spec.runtime !== 'browser') { console.log(`[${id}] native, nothing to check on the site`); return true; }
+  const raw = await runner(site ?? root, spec, outDir, { iterations: n });
   for (const [k, v] of Object.entries(measureFootprint(root, spec.footprint))) raw.metrics[k] = [v];
   if (spec.footprint.elf) for (const [k, v] of Object.entries(measureElf(root, spec.footprint.elf))) raw.metrics[k] = [v];
   raw.metrics.dependencies = [spec.dependencies.length];
@@ -139,6 +142,7 @@ async function main(argv: string[]): Promise<number> {
   const [cmd, arg, ...rest] = argv;
   const nIdx = rest.indexOf('-n');
   const iterations = nIdx >= 0 ? Number(rest[nIdx + 1]) : undefined;
+  const site = rest.includes('--site') ? join(root, '.cache/site') : undefined;
   switch (cmd) {
     case 'list':
       for (const id of allIds()) console.log(`${id}\n  ${loadSpec(specDir(id)).request}`);
@@ -149,7 +153,7 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     case 'bench': {
       let ok = true;
-      for (const id of select(arg)) ok = (await bench(id, iterations)) && ok;
+      for (const id of select(arg)) ok = (await bench(id, iterations, site)) && ok;
       return ok ? 0 : 1;
     }
     case 'report': {

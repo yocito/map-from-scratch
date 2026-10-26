@@ -57,9 +57,14 @@ export function fromDefinition(def: Definition): Loose {
         deviceScaleFactor: b.viewport.device_scale_factor ?? 1, mobile: b.viewport.mobile ?? false,
       },
       cpuThrottle: b.cpu_throttle ?? 1,
+      network: b.network && {
+        name: b.network.name, latencyMs: b.network.latency_ms,
+        downloadKbps: b.network.download_mbps * 1000, uploadKbps: (b.network.upload_mbps ?? b.network.download_mbps) * 1000,
+      },
     }
     : { cmd: b.cmd };
   if (run.viewport === undefined) delete run.viewport;
+  if (run.network === undefined) delete run.network;
   return {
     id: def.id,
     request: def.request,

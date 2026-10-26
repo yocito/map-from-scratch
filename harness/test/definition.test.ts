@@ -95,3 +95,10 @@ test('a native definition runs a command', () => {
   d.benchmarks = { runtime: 'native', cmd: ['build/x', '--bench'], iterations: 5, scenarios: [] };
   assert.deepEqual(fromDefinition(d).run, { cmd: ['build/x', '--bench'] });
 });
+
+test('benchmarks.network becomes the emulated network of the run', () => {
+  const d = def();
+  d.benchmarks.network = { name: '4G', latency_ms: 60, download_mbps: 9 };
+  assert.deepEqual(fromDefinition(d).run.network, { name: '4G', latencyMs: 60, downloadKbps: 9000, uploadKbps: 9000 });
+  assert.equal(fromDefinition(def()).run.network, undefined);
+});

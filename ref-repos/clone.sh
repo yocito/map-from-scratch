@@ -23,6 +23,7 @@ REPOS=$(cat <<'EOF'
 maplibre/maplibre-gl-js                   web-2d-3d         BSD-3-Clause
 maplibre/maplibre-native                  native            BSD-2-Clause
 maplibre/maplibre-rs                      rust              Apache-2.0/MIT
+yuiseki/maplibre-tile-spec                tile-format       Apache-2.0/MIT (MLT, the columnar successor of MVT; fork with speed-up ideas)
 maplibre/navara                           web-3d-globe      see LICENSE
 opengeos/RustGIS                          rust-gis          Apache-2.0
 reearth/reearth-papers                    research          MIT

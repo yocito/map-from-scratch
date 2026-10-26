@@ -52,3 +52,13 @@ Total               2128
 `;
   assert.deepEqual(parseSizeA(out), { text: 1812, rodata: 250, ram: 76 });
 });
+
+test('a listed directory counts every file under it', async () => {
+  const { mkdirSync } = await import('node:fs');
+  const d = mkdtempSync(join(tmpdir(), 'fp-'));
+  mkdirSync(join(d, 'tiles/3'), { recursive: true });
+  writeFileSync(join(d, 'tiles/3/1.bin'), Buffer.alloc(10));
+  writeFileSync(join(d, 'tiles/3/2.bin'), Buffer.alloc(20));
+  writeFileSync(join(d, 'tiles/index.bin'), Buffer.alloc(5));
+  assert.equal(measureFootprint(d, { code: [], data: ['tiles'] }).data_bytes, 35);
+});

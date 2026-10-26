@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync, rmSync, appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { CDP } from '../lib/cdp.ts';
 import { serve } from '../lib/serve.ts';
@@ -100,14 +101,21 @@ async function runOnce(chrome: Chrome, url: string, spec: RunSettings, outDir: s
     await s('Performance.enable');
     await s('Network.enable');
     await s('Network.setCacheDisabled', { cacheDisabled: true });
+    const net = spec.run.network;
+    if (net) {
+      await s('Network.emulateNetworkConditions', {
+        offline: false, latency: net.latencyMs,
+        downloadThroughput: (net.downloadKbps * 1000) / 8, uploadThroughput: (net.uploadKbps * 1000) / 8,
+      });
+    }
     const v = spec.run.viewport!;
     await s('Emulation.setDeviceMetricsOverride', v);
     if (v.mobile) await s('Emulation.setTouchEmulationEnabled', { enabled: true });
     await s('Emulation.setCPUThrottlingRate', { rate: spec.run.cpuThrottle });
     await s('Runtime.addBinding', { name: '__mfsEmit' });
 
-    let bytes = 0;
-    off.push(cdp.on('Network.loadingFinished', (p, sid) => { if (sid === sessionId) bytes += p.encodedDataLength; }));
+    let bytes = 0, requests = 0;
+    off.push(cdp.on('Network.loadingFinished', (p, sid) => { if (sid === sessionId) { bytes += p.encodedDataLength; requests++; } }));
     const done = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`timeout after ${spec.timeoutMs} ms`)), spec.timeoutMs);
       off.push(cdp.on('Runtime.bindingCalled', (p, sid) => {
@@ -131,6 +139,7 @@ async function runOnce(chrome: Chrome, url: string, spec: RunSettings, outDir: s
     const m: Record<string, number> = Object.fromEntries(metrics.map((x: { name: string; value: number }) => [x.name, x.value]));
     collector.add({ metric: 'js_heap_mb', value: m.JSHeapUsedSize / 2 ** 20 });
     collector.add({ metric: 'transfer_kb', value: bytes / 1024 });
+    collector.add({ metric: 'requests', value: requests });
     collector.add({ metric: 'browser_rss_mb', value: treeRssMb(chrome.pid) });
     if (screenshot) {
       const { data } = await s('Page.captureScreenshot', { format: 'png' });
@@ -142,8 +151,11 @@ async function runOnce(chrome: Chrome, url: string, spec: RunSettings, outDir: s
   }
 }
 
+// root: where the pages are served from (the repository, or the built site);
+// the harness's own pages always come from the repository.
 export async function benchBrowser(root: string, spec: RunSettings, outDir: string, { iterations }: { iterations: number }): Promise<RawResult> {
-  const server = await serve(root);
+  const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const server = await serve(root, 0, '127.0.0.1', { '/harness/probe/': join(repo, 'harness/probe') });
   // MFS_PAGE_QUERY appends parameters, for comparing variants of a renderer.
   const extra = process.env.MFS_PAGE_QUERY ? `&${process.env.MFS_PAGE_QUERY}` : '';
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/${spec.run.page}?bench=1${extra}`;
