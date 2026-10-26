@@ -12,6 +12,8 @@
 
 ## 例
 
+ブラウザで動く例は GitHub Pages で実際に操作できます: https://yuiseki.github.io/map-from-scratch/
+
 | 例 | 依頼 (要約) | 実行環境 |
 | --- | --- | --- |
 | [01-prefecture-picker](examples/01-prefecture-picker/REQUEST.md) | 観光サイトの記事に埋め込む都道府県ピッカー。外部ライブラリ不可、軽く | Canvas 2D |
@@ -74,6 +76,7 @@ bin/mfs build all      # ネイティブの例をビルドする
 bin/mfs bench all      # 計測して予算と照合する。結果は results/<id>/
 bin/mfs report         # 最新の結果を Markdown の表で出す
 bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:8080/examples/
+tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて GitHub Pages に公開する
 ```
 
 新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
