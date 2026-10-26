@@ -29,8 +29,9 @@
 | [16-plateau-buildings-3d](examples/16-plateau-buildings-3d/spec.yaml) | 東京駅周辺の PLATEAU 建物を 3D で回して見る | WebGL2 |
 | [17-fuji-terrain-3d](examples/17-fuji-terrain-3d/REQUEST.md) | 富士山周辺の地形を 3D で回して見る | WebGL2 |
 | [18-fuji-aerial-terrain](examples/18-fuji-aerial-terrain/REQUEST.md) | 富士山の 3D 地形にシームレス空中写真を重ねる | WebGL2 |
+| [19-kontur-h3-population](examples/19-kontur-h3-population/REQUEST.md) | Kontur の世界人口を 71,283 個の H3 六角形で塗り分ける | Canvas 2D |
 
-各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10 と 18 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10、18、19 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
 サイトのカードにはブラウザ用の例に加え、デスクトップ用・マイコン用の例へのソースリンクも掲載します。
 Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 

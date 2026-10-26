@@ -13,6 +13,13 @@ const NE = '/sata_hdd_24tb/hf_data/__published/ne-admin0-10m/v5.1.1/shapefile';
 interface Source { out: string; local: string; remote?: string; ogr?: string[]; copy?: boolean }
 
 const SOURCES: Record<string, Source> = {
+  // Kontur Population 2023-11-01, H3 resolution 4, CC BY.
+  'kontur-population-r4': {
+    out: 'kontur_population_20231101_r4.parquet',
+    local: '/sata_hdd_24tb/hf_data/kontur-population-2023-11-01-22km/data/parquet/kontur_population_20231101_r4.parquet',
+    remote: 'https://huggingface.co/datasets/yuiseki/kontur-population-2023-11-01-22km/resolve/main/parquet/kontur_population_20231101_r4.parquet',
+    copy: true,
+  },
   // Natural Earth 10m admin 0, v5.1.1. Public domain.
   'ne-countries': {
     out: 'ne_10m_admin_0_countries.geojson',

@@ -1,0 +1,48 @@
+id: 19-kontur-h3-population
+request: Hugging Face の Kontur Population 2023-11-01 22km データセットを H3 で可視化したい。
+requirements:
+  - id: h3-geometry
+    need: 元データの H3 セル形状で人口を塗り分ける
+    unmeasured: GeoParquet の Polygon と MultiPolygon をベイクし、ブラウザで塗り分ける。目視確認を依頼する。
+  - id: population-detail
+    need: セルの人口と H3 ID を確認できる
+    unmeasured: カーソル位置のセルを判定して表示する。目視確認を依頼する。
+  - id: navigation
+    need: 世界から都市まで移動・拡大できる
+    unmeasured: ドラッグ、ホイール、地域ボタンで操作できる。目視確認を依頼する。
+  - id: attribution
+    need: 元データの出典を表示する
+    unmeasured: Kontur とデータセットおよび CC BY へのリンクを画面に表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/19-kontur-h3-population/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: [node, examples/19-kontur-h3-population/bake.ts]
+  sources:
+    - id: kontur-population-r4
+      origin: https://huggingface.co/datasets/yuiseki/kontur-population-2023-11-01-22km
+      license: Creative Commons Attribution（CC BY）。Kontur Population dataset © Kontur。
+  outputs: [data/baked/19-kontur-h3-population/cells.bin]
+  preparation:
+    - GeoParquet から H3 ID・推計人口・EPSG:3857 のセル形状を読む
+    - Web Mercator 座標を 16-bit に量子化し、H3 ID と人口とともにブラウザ用バイナリにする
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D と Path2D
+    language: TypeScript
+    gpu: none
+    code: [examples/19-kontur-h3-population/index.html, examples/19-kontur-h3-population/main.ts]
+    dependencies: []
+    why: 71,283 のセルを人口階級ごとの Path2D にまとめ、表示時の塗り分けを少数の描画呼び出しにする
+  alternatives:
+    - GeoParquet をブラウザで直接読むと、Parquet と WKB の復号処理が必要になるため採用しない
+  not_doing: [地形, 国境線, 年次比較, 外部地図ライブラリ]
+verification:
+  checks: []
