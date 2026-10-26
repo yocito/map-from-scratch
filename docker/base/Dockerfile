@@ -10,6 +10,7 @@ RUN apt-get update \
       rustc cargo \
       chromium \
       libvulkan1 libegl1 libgles2 libegl-dev libgles-dev libx11-dev \
+      clang lld llvm \
       gdal-bin \
       osmium-tool \
       procps \

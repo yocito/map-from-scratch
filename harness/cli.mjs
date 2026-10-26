@@ -15,7 +15,7 @@ import { loadSpec } from './lib/spec.mjs';
 import { summarize } from './lib/stats.mjs';
 import { checkBudgets } from './lib/budget.mjs';
 import { serve } from './lib/serve.mjs';
-import { measureFootprint, checkDependencies, isSoftwareGpu } from './lib/footprint.mjs';
+import { measureFootprint, measureElf, checkDependencies, isSoftwareGpu } from './lib/footprint.mjs';
 import { benchNative } from './runners/native.mjs';
 import { benchBrowser } from './runners/browser.mjs';
 
@@ -64,6 +64,7 @@ async function bench(id, iterations) {
   const runner = spec.runtime === 'browser' ? benchBrowser : benchNative;
   const raw = await runner(root, spec, outDir, { iterations: n });
   for (const [k, v] of Object.entries(measureFootprint(root, spec.footprint))) raw.metrics[k] = [v];
+  if (spec.footprint.elf) for (const [k, v] of Object.entries(measureElf(root, spec.footprint.elf))) raw.metrics[k] = [v];
   raw.metrics.dependencies = [spec.dependencies.length];
   for (const d of checkDependencies(spec.dependencies)) raw.errors.push(`dependency not allowed: ${d}`);
   if (spec.gpu === 'hardware' && !raw.info.gpu) raw.errors.push('renderer did not report info.gpu');

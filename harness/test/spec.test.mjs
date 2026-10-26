@@ -54,3 +54,9 @@ test('gpu defaults to hardware, dependencies to none', () => {
   assert.deepEqual(s.dependencies, []);
   assert.throws(() => validateSpec({ ...structuredClone(browser), gpu: 'maybe' }, '01-x'), /gpu/);
 });
+
+test('a microcontroller spec may give footprint.elf instead of code', () => {
+  const s = structuredClone(browser);
+  s.footprint = { elf: ['build/x.o'] };
+  assert.deepEqual(validateSpec(s, '01-x').footprint.code, []);
+});

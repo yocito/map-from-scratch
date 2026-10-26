@@ -34,3 +34,20 @@ test('software rasterisers are recognised', () => {
   assert.equal(isSoftwareGpu('llvmpipe (LLVM 19.1.7, 256 bits)'), true);
   assert.equal(isSoftwareGpu(undefined), false);
 });
+
+test('parseSizeA sums sections by kind from llvm-size -A output', async () => {
+  const { parseSizeA } = await import('../lib/footprint.mjs');
+  const out = `mcumap.o  :
+section             size   addr
+.text                 12      0
+.text.mm_render     1800      0
+.rodata              240      0
+.rodata.str1.1        10      0
+.sdata                 4      0
+.bss                  64      0
+.sbss                  8      0
+.comment              40      0
+Total               2128
+`;
+  assert.deepEqual(parseSizeA(out), { text: 1812, rodata: 250, ram: 76 });
+});

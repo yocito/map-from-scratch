@@ -76,3 +76,27 @@ export function polygonsOf(geometry) {
   if (geometry.type === 'MultiPolygon') return geometry.coordinates;
   return [];
 }
+
+// Clip a polyline to [minx, miny, maxx, maxy] (Liang–Barsky per segment).
+// Returns the pieces that lie inside; a line that leaves and comes back
+// becomes two pieces.
+export function clipPolyline(pts, [x0, y0, x1, y1]) {
+  const out = [];
+  let cur = null;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i];
+    const dx = bx - ax, dy = by - ay;
+    let t0 = 0, t1 = 1, ok = true;
+    for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]]) {
+      if (p === 0) { if (q < 0) ok = false; continue; }
+      const r = q / p;
+      if (p < 0) t0 = Math.max(t0, r); else t1 = Math.min(t1, r);
+    }
+    if (!ok || t0 > t1) { cur = null; continue; }
+    const a = [ax + t0 * dx, ay + t0 * dy], b = [ax + t1 * dx, ay + t1 * dy];
+    if (!cur || t0 > 0) { cur = [a]; out.push(cur); }
+    cur.push(b);
+    if (t1 < 1) cur = null;
+  }
+  return out;
+}

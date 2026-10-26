@@ -22,9 +22,11 @@ export function validateSpec(spec, dirName) {
   } else if (!Array.isArray(spec.run.cmd)) {
     fail('run.cmd (argv array) is required for a native renderer');
   }
-  if (!Array.isArray(spec.footprint?.code) || spec.footprint.code.length === 0) {
-    fail('footprint.code (files that ship) is required');
-  }
+  // Code that ships: files (footprint.code), or for a microcontroller the
+  // object files whose sections are measured (footprint.elf).
+  const shipped = [...(spec.footprint?.code ?? []), ...(spec.footprint?.elf ?? [])];
+  if (shipped.length === 0) fail('footprint.code or footprint.elf (what ships) is required');
+  spec.footprint.code ??= [];
   spec.footprint.data ??= [];
   spec.dependencies ??= [];
   spec.gpu ??= 'hardware';

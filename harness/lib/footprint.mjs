@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
@@ -23,6 +24,34 @@ export function measureFootprint(root, { code = [], data = [] }) {
     data_bytes: dataBufs.reduce((a, b) => a + b.length, 0),
     data_gzip_bytes: gz(dataBufs),
   };
+}
+
+// For microcontroller targets, what an object file will occupy: code in
+// flash (.text), constants in flash (.rodata), and RAM (.data + .bss, small
+// data sections included). Input is `llvm-size -A` output.
+export function parseSizeA(text) {
+  const r = { text: 0, rodata: 0, ram: 0 };
+  for (const line of text.split('\n')) {
+    const m = line.match(/^(\.\S+)\s+(\d+)/);
+    if (!m) continue;
+    const [, name, size] = m;
+    if (/^\.text/.test(name)) r.text += Number(size);
+    else if (/^\.s?rodata/.test(name)) r.rodata += Number(size);
+    else if (/^\.s?(data|bss)/.test(name)) r.ram += Number(size);
+  }
+  return r;
+}
+
+// spec.footprint.elf: object files to size with llvm-size.
+export function measureElf(root, files) {
+  const sum = { elf_text_bytes: 0, elf_rodata_bytes: 0, elf_ram_bytes: 0 };
+  for (const f of files) {
+    const s = parseSizeA(execFileSync('llvm-size', ['-A', join(root, f)], { encoding: 'utf8' }));
+    sum.elf_text_bytes += s.text;
+    sum.elf_rodata_bytes += s.rodata;
+    sum.elf_ram_bytes += s.ram;
+  }
+  return sum;
 }
 
 export const ALLOWED_DEPENDENCIES = ['earcut'];

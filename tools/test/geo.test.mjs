@@ -43,3 +43,15 @@ test('polygonsOf flattens Polygon and MultiPolygon', () => {
   assert.equal(polygonsOf({ type: 'MultiPolygon', coordinates: [p, p] }).length, 2);
   assert.equal(polygonsOf({ type: 'Point', coordinates: [0, 0] }).length, 0);
 });
+
+test('clipPolyline keeps what is inside and splits where a line leaves and re-enters', async () => {
+  const { clipPolyline } = await import('../geo.mjs');
+  const box = [0, 0, 10, 10];
+  assert.deepEqual(clipPolyline([[1, 1], [5, 5]], box), [[[1, 1], [5, 5]]]);
+  assert.deepEqual(clipPolyline([[-5, 5], [5, 5]], box), [[[0, 5], [5, 5]]]);
+  assert.deepEqual(clipPolyline([[20, 20], [30, 30]], box), []);
+  // in, out, in again: two pieces
+  assert.deepEqual(clipPolyline([[5, 5], [15, 5], [15, 8], [5, 8]], box), [[[5, 5], [10, 5]], [[10, 8], [5, 8]]]);
+  // crossing straight through
+  assert.deepEqual(clipPolyline([[-10, 5], [20, 5]], box), [[[0, 5], [10, 5]]]);
+});
