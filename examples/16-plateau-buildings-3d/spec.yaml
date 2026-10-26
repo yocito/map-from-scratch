@@ -1,0 +1,220 @@
+id: 16-plateau-buildings-3d
+request: >-
+  東京駅のまわりの建物を、PLATEAU の 3D モデルで、PC のブラウザでぐるぐる回して見たい。
+
+requirements:
+  - id: pc-browser
+    need: PC のブラウザで
+    unmeasured: 端末ではなく、benchmarks の画面 (1280×800、DPR 1、CPU スロットルなし) と回線 (fast、20 ms、50 Mbps) で代わりに測る
+  - id: orbit
+    need: ぐるぐる回して見たい
+    rationale: PC の 120 Hz に合わせ、周回・固定視点・寄り引きのフレームを GPU 完了まで 8.3 ms 以下、GPU 時間 4 ms 以下。ドラッグはイベントから GPU 完了まで 60 Hz の 16.7 ms 以下。回しても読み直さないことは no-refetch で見る
+  - id: see-soon
+    need: (開いたら) すぐ見たい
+    rationale: >-
+      最初の斜め俯瞰 (V1) で、見えるタイルの外殻 (L0) がそろうまで p50 500 ms、付属物 (L1) までそろうまで 1,200 ms。
+      読むバイト数とリクエスト数は時間より揺れないので、ベイク後の実測の約 1.05 倍を上限にした。
+      元の CityGML を Range で読む場合 (同じ V1 で 154 MB) に対し 30 分の 1 以下
+  - id: around-station
+    need: 東京駅のまわり
+    unmeasured: >-
+      区域を東京駅から ±1,000 m の正方形 (2 km 四方) にした。そこに重心がある全 3,992 棟が描かれていることを
+      verification の truth-buildings、every-building-drawn、ground-covers で確かめる
+  - id: plateau-3d
+    need: PLATEAU の 3D モデルで
+    rationale: >-
+      LOD2 (ない 32 棟は LOD1) の面と付属物をそのまま三角形にする。捨てる三角形は、100 cm² 未満の (ほぼ見えない) 多角形のもの以外は
+      0.1% 以下 (dropped_ratio)。形が正しいことは truth 系の検査と tallest-on-horizon で、出典の表示は attribution で見る
+  - id: static-and-light
+    need: GitHub Pages の静的ファイルで配り、GPU メモリは控えめに (この作業の条件)
+    rationale: 1 ファイル 95 MB 未満、データ合計 5 MB 以下、配るコード gzip 16 KB 以下、GPU バッファ 16 MB 以下、JS ヒープ 64 MB 以下
+
+evaluation:
+  budgets:
+    - {metric: first_frame_ms, stat: p50, max: 500, unit: ms, requirement: see-soon}
+    - {metric: settled_ms, stat: p50, max: 1200, unit: ms, requirement: see-soon}
+    - {metric: first_range_bytes, stat: max, max: 1250000, unit: B, requirement: see-soon}
+    - {metric: settled_range_bytes, stat: max, max: 3950000, unit: B, requirement: see-soon}
+    - {metric: close_range_bytes, stat: max, max: 2550000, unit: B, requirement: see-soon}
+    - {metric: first_range_requests, stat: max, max: 4, requirement: see-soon}
+    - {metric: settled_range_requests, stat: max, max: 8, requirement: see-soon}
+    - {metric: close_range_requests, stat: max, max: 12, requirement: see-soon}
+    - {metric: cold_requests, stat: max, max: 16, requirement: see-soon}
+    - {metric: bytes_vs_citygml_v1, stat: min, min: 30, requirement: see-soon}
+    - {metric: frame_ms, stat: p95, max: 8.3, unit: ms, requirement: orbit}
+    - {metric: gpu_ms, stat: p95, max: 4, unit: ms, requirement: orbit}
+    - {metric: whole_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: orbit}
+    - {metric: grazing_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: orbit}
+    - {metric: close_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: orbit}
+    - {metric: zoom_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: orbit}
+    - {metric: drag_ms, stat: p95, max: 16.7, unit: ms, requirement: orbit}
+    - {metric: orbit_range_requests, stat: max, max: 0, requirement: orbit}
+    - {metric: dropped_ratio, stat: max, max: 0.001, requirement: plateau-3d}
+    - {metric: gpu_buffer_bytes, stat: max, max: 16000000, unit: B, requirement: static-and-light}
+    - {metric: js_heap_mb, stat: p95, max: 64, unit: MB, requirement: static-and-light}
+    - {metric: code_gzip_bytes, max: 16000, unit: B, requirement: static-and-light}
+    - {metric: data_bytes, max: 5000000, unit: B, requirement: static-and-light}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/16-plateau-buildings-3d/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  network: {name: fast, latency_ms: 20, download_mbps: 50}
+  cpu_throttle: 1
+  iterations: 5
+  timeout_ms: 240000
+  scenarios:
+    - id: first-frame
+      what: >-
+        ナビゲーション開始 (performance.now() の 0) から、V1 (T(0,0,20)、yaw 135、pitch 30、距離 1,500 m) で見える全タイルの L0 を
+        描き、1 px の readPixels で GPU の完了を待った時刻まで。計測用コード (bench.ts) は settled のあとで読み込むので含まない。
+        その時点までにアーカイブを読んだバイト数とリクエスト数も出す
+      metrics: [first_frame_ms, first_range_bytes, first_range_requests]
+    - id: settled
+      what: 同じ起点から、V1 で見える全タイルの L1 まで描き終えた時刻。range_bytes と range_requests はこの場面の値 (settled_* と同じ)。cold_requests はそこまでのページ全体のリクエスト (文書を含む)
+      metrics: [settled_ms, settled_range_bytes, settled_range_requests, range_bytes, range_requests, cold_requests, bytes_vs_citygml_v1]
+    - id: close-cold
+      what: GPU のバッファと読み込み状態をすべて捨ててから V3 (丸の内駅舎を西から、距離 250 m、pitch 15) にして、落ち着くまで。そのあと同じ視点の 120 フレーム
+      metrics: [close_settled_ms, close_range_bytes, close_range_requests, close_frame_ms]
+    - id: orbit
+      what: >-
+        T(0,0,20)、距離 800、pitch 35、yaw 0〜359 を 2 周。1 周目は空の状態から rAF ごとに 1 度ずつ回しながら読み込み、10 度ごとに落ち着かせる。
+        2 周目は benchFrames で 360 フレーム (GPU 完了まで)。2 周目のリクエスト数も出す
+      metrics: [cpu_ms, frame_ms, gpu_ms, orbit_range_requests, orbit_range_bytes]
+    - id: whole-view
+      what: V2 (真上から全体、59 タイルすべて) の固定視点 120 フレーム。その時点の GPU バッファの合計も出す
+      metrics: [whole_frame_ms, whole_gpu_ms, gpu_buffer_bytes]
+    - id: zoom
+      what: T(0,0,20)、yaw 135、pitch 35 で、距離 3,000 m から 80 m へ寄って 3,000 m へ戻る 300 フレーム
+      metrics: [zoom_frame_ms, zoom_gpu_ms]
+    - id: grazing-view
+      what: V4 (T(-600,0,30) から東へ、pitch 5、距離 600) の固定視点 120 フレーム。手前の建物で奥が隠れる低い視点
+      metrics: [grazing_frame_ms, grazing_gpu_ms]
+    - id: drag
+      what: V1 でページの中から PointerEvent (pointerdown、pointermove 3 px ずつ 120 回) を送り、各 pointermove から、その rAF で描いたフレームの GPU 完了 (1 px の readPixels) まで
+      metrics: [drag_ms]
+    - id: truth
+      what: ?whole=1 と同じ 1 回の取得でアーカイブ全体を読み、全ブロックをデコードして truth.json (DuckDB) と比べる。100 cm² 未満の多角形以外で捨てた三角形の割合を出す
+      metrics: [dropped_ratio]
+    - id: citygml-compare
+      what: >-
+        比較用の別の実行 (MFS_PAGE_QUERY=citygml=1、ローカルだけ)。元の zip 2 つを data/raw/plateau/ のリンクから同じ回線で Range 読みし
+        (末尾 64 KiB、中央ディレクトリ、メッシュ 9 枚のメンバー)、DecompressionStream、TextDecoderStream、ストリームの XML 走査、earcut を経て V1 を描くまで。
+        このモードでは通常の予算の指標は出ないので、その実行の予算は不合格になる (比較値として performance_knowledge に記録する)。
+        check citygml-same-scene もこのモードでだけ出す
+      metrics: [citygml_first_frame_ms, citygml_range_bytes, citygml_range_requests, citygml_ground_bytes]
+
+datasets:
+  bake: [node, examples/16-plateau-buildings-3d/bake.ts]
+  sources:
+    - id: plateau-13101-2025
+      origin: >-
+        3D都市モデル（Project PLATEAU）千代田区（2025年度）CityGML（v5）、13101_chiyoda-ku_pref_2025_citygml_1_op.zip (2,107,396,115 B)。
+        https://www.geospatial.jp/ckan/dataset/plateau-13101-chiyoda-ku-2025 。ローカルの写し /sata_hdd_24tb/hf_data/plateau-citygml-jp/data/raw/13101_chiyoda-ku/2025/
+        (tools/sources.ts にはまだない。bake.ts が直接読む)
+      license: PLATEAU サイトポリシー 3 (著作権は千代田区、PDL1.0、CC BY 4.0 互換)
+    - id: plateau-13102-2025
+      origin: >-
+        3D都市モデル（Project PLATEAU）中央区（2025年度）CityGML（v5）、13102_chuo-ku_pref_2025_citygml_1_op.zip (2,475,027,497 B、ZIP64)。
+        https://www.geospatial.jp/ckan/dataset/plateau-13102-chuo-ku-2025 。ローカルの写し /sata_hdd_24tb/hf_data/plateau-citygml-jp/data/raw/13102_chuo-ku/2025/
+      license: PLATEAU サイトポリシー 3 (著作権は中央区、PDL1.0、CC BY 4.0 互換)
+  outputs:
+    - data/baked/16-plateau-buildings-3d/tokyo-station-2km.v1.plb
+    - data/baked/16-plateau-buildings-3d/truth.json
+    - data/baked/16-plateau-buildings-3d/citygml-cost.json
+  preparation:
+    - 両 zip の末尾と中央ディレクトリを zip.ts で読み、区域に触れる 3 次メッシュ 9 枚の建物 GML を選ぶ (区をまたぐメッシュは両 zip に同じものがあり、千代田を優先。53394602 と 53394612 は中央にだけある)
+    - メンバーを zlib でストリーム展開し、zip の CRC32 と照合しながら gml.ts の自前のストリーミング走査器に流す (1.2 GB の XML。DuckDB の正解値用に data/raw/plateau/gml/ にも書く)
+    - 東京駅 (35.68124, 139.76712) を原点に、GRS80 の子午線と卯酉線の曲率半径で x = 経度差 × kx、y = 緯度差 × ky (m)、z は標高のまま
+    - 建物は lod1Solid の全頂点の平均で 250 m タイル (8×8) に割り当て、±1,000 m の外は捨てる (3,992 棟、59 タイル)。切り取らない
+    - L0 は boundedBy の lod2MultiSurface (屋根・壁・底・OuterCeiling/Floor)、LOD2 がない 32 棟は lod1Solid。L1 は BuildingInstallation の lod2Geometry
+    - 多角形ごとに閉じ点と連続する重複点を除き、外周の Newell 法線の主軸平面に射影して earcut。向きは三角形ごとに Newell 法線にそろえる
+    - タイルの AABB の最小から 1 cm 単位の u16 にし、同じ位置の頂点を溶接。1 cm で面積 0 になる三角形は捨てて数える
+    - レベルごとに建物を重心の Morton 順に並べ、頂点は初めて使われた順に番号を付ける。位置は平面ごとの zigzag 差分 u16、添字は high-water mark の u16 (quantized-mesh と同じ)。deflate-raw level 9
+    - 地面は両区の DEM (TIN、198 万三角形) を 241×241 (8.33 m) の格子へ重心座標で焼き、TIN のない点 (区域の外の区) は隣の平均で埋める。cm の u16 の zigzag 差分を deflate (57 KB)
+    - 1 ファイル PLB1 に、ヘッダ、索引、地面、L0 ブロック (タイルの Hilbert 順)、L1 ブロック (同じ順) を並べる。書いたあと全ブロックを読み戻して元と比べる
+    - truth.sql を DuckDB で GML ごとに実行し (行として読み、XML 走査器も earcut も使わない)、truth.json を作る。両方の棟の集合が一致することをベイクで表示する
+    - 各視点で camera.ts の frame() と同じ判定で見えるタイルとメッシュを求め、元の zip を Range で読む場合のバイト数とリクエスト数を citygml-cost.json に書く
+
+performance_knowledge:
+  - id: placeholder
+    finding: 計測後に書く
+    evidence: '-'
+    applies_when: '-'
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2 (深度 24 bit、MSAA)
+    language: TypeScript (ES modules、ビルドなし。配るときは型を外すだけ)
+    gpu: hardware
+    code: [examples/16-plateau-buildings-3d/index.html, examples/16-plateau-buildings-3d/main.ts, examples/16-plateau-buildings-3d/render.ts, examples/16-plateau-buildings-3d/plb.ts, examples/16-plateau-buildings-3d/camera.ts]
+    dependencies: []
+    why: 93 万三角形を 120 Hz で回すために GPU で描く。データは専用の形式 PLB1 を Range で読む
+  alternatives:
+    - option: 元の CityGML (zip) を Range で読む
+      rejected_because: 計測で比べた (citygml-compare、performance_knowledge)
+  not_doing: [テクスチャ, 選択と属性の表示, 影と AO, ラベル, LOD3 と LOD4, 道路・橋・植生, 区域の外の地形, LOD の切り替え, 取り出し (eviction), worker, タッチの調整, 地球全体と投影の切り替え]
+
+verification:
+  checks:
+    - id: range-206
+      what: アーカイブへの Range の応答がすべて 206 で、Content-Range が要求と一致し、Content-Encoding がない。magic、版、索引の CRC32 が一致する
+      how: plb.ts の Archive が残す応答の記録を見る。ヘッダの検査は parseHeader が行い、合わなければ例外になる
+      expected: 全応答が 206
+    - id: truth-buildings
+      what: 索引のタイル別の棟数が truth.json (DuckDB) と一致する
+      how: 59 タイルそれぞれと合計を比べる
+      expected: 3,992 棟、全タイル一致
+    - id: truth-triangles
+      what: デコードした添字数 ÷ 3 + 索引の捨てた数が、タイルとレベルごとに truth の式 Σ(点数−1)−2+2·穴 と一致し、100 cm² 未満の多角形以外で捨てた割合が 0.1% 以下
+      how: アーカイブ全体を 1 回で読み、全ブロックをデコードして数える
+      expected: 118 のタイルとレベルがすべて一致
+    - id: truth-extent
+      what: デコードした頂点のタイルごとの AABB が、truth の全座標の min/max と 1 cm + 1e-6 m 以内で一致し、最大 z が 241.546 ± 0.01 m
+      how: 同上
+      expected: 全タイル一致、最大 z 241.55
+    - id: tallest-on-horizon
+      what: 目の高さを最も高い点 (241.546 m) にした水平な視線で、最も高い建物を 600 m 先に置くと、中央の行より 2 px 以上上は全幅で空。目を 2 m 下げると建物が上に出る
+      how: 透視投影の行列を差し替えて描き、全ピクセルを読み戻す
+      expected: 0 ピクセルと 1 ピクセル以上
+    - id: every-building-drawn
+      what: 真上からの正射影で全体を描くと、truth の各建物の lod0 footprint の PointOnSurface の 3×3 近傍に、地面でも空でもない色がある
+      how: 正射影の行列を差し替え、区域を 4 分割 (1 px 1.3 m) して描き、全ピクセルを読み戻す。地面は緑が赤より 4 以上大きく青より大きい色 (平らな地面は G − R = 14。屋根と地面のサンプルが混ざった画素は地面に数えない)、空は背景色 ±3
+      expected: 25 m² 以上の footprint は 100%、全体で 99.5% 以上
+    - id: ground-covers
+      what: 同じ表示で、区域の正方形の中に空の色のピクセルがない
+      how: 同上
+      expected: 0 ピクセル
+    - id: wall-luminance-equal
+      what: ベイクが選んだ、別々のタイルにある南向きの大きな壁 2 枚を、それぞれ 8 m 正面から見たとき、中央 5×5 px の輝度の差が 3 以内 (光がローカル座標系で決まっていること)
+      how: 行列を差し替えて描き、中央を読み戻す
+      expected: 差 ≤ 3
+    - id: detail-arrives
+      what: V3 で落ち着いたあと、見える全タイルの L1 が描かれていて、L0 だけの画像と 1% 以上のピクセルが違う
+      how: L1 を描かない画像と描いた画像を読み戻して比べる
+      expected: 1% 以上
+    - id: no-refetch
+      what: 周回の 2 周目でリクエストが 0 で、GPU バッファの合計が増えない
+      how: Archive の数と描画器の gpuBytes を前後で比べる
+      expected: 0 リクエスト、増加 0
+    - id: idle-no-frames
+      what: 落ち着いてから 500 ms の間、描画の rAF が発火しない
+      how: 描画器のフレーム数を前後で比べる
+      expected: 0 フレーム
+    - id: near-far-finite
+      what: 計測したすべてのフレームで 1 ≤ near < far < 10,000 で有限
+      how: 各フレームの frame() の結果を集める
+      expected: 違反 0
+    - id: attribution
+      what: DOM に「千代田区」「中央区」「PLATEAU」「PDL1.0」と、両データセットの CKAN の名前がある
+      how: document.body.textContent を見る
+      expected: すべてある
+    - id: whole-equals-range
+      what: アーカイブを 1 回で丸ごと読んで (?whole=1 と同じ経路) 描いた V1 が、Range で読んで描いた V1 とピクセル単位で一致する
+      how: 両方の V1 を読み戻して比べる
+      expected: 違うバイト 0
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画ならエラーにする
