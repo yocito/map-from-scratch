@@ -1,0 +1,62 @@
+# Measurements that lied, and how they were caught
+
+Every item here happened while building the examples. Each one produced
+plausible numbers. Suspect the measurement before the renderer.
+
+## The environment
+
+- **A browser flag crashed the GPU process.** With `--enable-features=...,VulkanFromANGLE`
+  headless Chromium lost every GPU context about 300 ms after launch. Picking
+  returned 0 everywhere (02) and a 2D canvas lost its transform (01). The
+  harness now uses a minimal flag set, warms up until a WebGL context survives
+  one second, and records `warmup_attempts`. `bin/mfs probe lifetime` checks
+  context lifetime directly.
+- **Environment variables did not reach the container.** For a while
+  `MFS_CHROME_FLAGS` was not passed through `bin/mfs`, so a series of flag
+  experiments all ran with the defaults and "no flag made a difference".
+  When an experiment varies a setting, confirm the setting arrived (the
+  results now record `page_query`).
+- **WebGPU on SwiftShader.** Google's Chromium build offers a WebGPU adapter
+  in the container, but it is SwiftShader. Any WebGPU number from it is a CPU
+  number. The harness fails a `gpu: hardware` example whose `info.gpu` names
+  a software rasteriser.
+- **Timer resolution.** Without cross-origin isolation `performance.now()`
+  is coarsened to 100 us. The static server sends COOP/COEP so it is 5 us.
+
+## The measurement method
+
+- **Measuring the read-back, not the drawing.** Syncing a Canvas 2D frame
+  with `getImageData` made "redraw" 14 ms; recording the draw calls took
+  0.02 ms. Canvas 2D work happens at composite time: measure the frame
+  interval of rAF instead, against an idle page (01).
+- **A percentile that hides the worst view.** A camera path's p95 (5.2 ms)
+  hid that the all-in-view frame cost 11.7 ms (04). Bench the cheap and the
+  expensive ends as fixed views with their own budgets.
+- **Name collisions between metrics.** The native runner's process CPU time
+  was also called `cpu_ms` and mixed five 1,000 ms values into the per-frame
+  CPU times (05). It is now `process_cpu_ms`.
+- **Reading a rounded table.** `193200` in the summary was 193,170 rounded to
+  four digits; it looked like a counter that never changed (06). Read
+  `latest.json` before concluding.
+- **Host time is not device time.** For a microcontroller, report the work
+  (segments drawn, pixels written, roads tested) next to host time; only the
+  work carries over (06).
+- **First launch is not every launch.** With a program binary cache, the
+  first start costs 183 ms and 166 MB, the next ones 107 ms and 124 MB (05).
+  Make the bench include a cold start and say which statistic each budget is
+  on.
+
+## The renderer drew nothing
+
+- **An incomplete texture returns zeros.** R32F is not filterable; with the
+  default filters the texture is incomplete and every `texelFetch` gives 0.
+  The count check passed because it read the count framebuffer directly; the
+  screen was black (04). Check what reaches the screen.
+- **A hand-picked coordinate missed the road.** A functional check placed at
+  "where Route 3 should be" read the background; the renderer was right.
+  Take check locations from the baked data itself (05, 06).
+- **Conclusions measured under broken conditions survive the fix.** After the
+  flag fix, three earlier findings had to be re-measured: the CPU canvas was
+  slower, not safer (01); incremental repaint was not needed (01); a GPU-time
+  difference between vertex layouts disappeared (02). Re-run what was
+  measured under the broken setting and correct REQUEST.md.
