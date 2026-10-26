@@ -1,0 +1,47 @@
+id: 10-gsi-seamlessphoto
+request: >-
+  z.yuiseki.net に置いた国土地理院の全国最新写真（シームレス）を、ブラウザで移動・拡大しながら見たい。
+  約715GBの PMTiles 全体はダウンロードせず、画面に必要な写真だけを読む。
+requirements:
+  - id: browse-photo
+    need: 写真をドラッグとホイールで移動・拡大できる
+    unmeasured: 画面上で操作できる。自動検証は未実施。
+  - id: range-only
+    need: 巨大な PMTiles を丸ごとダウンロードしない
+    unmeasured: Range 206 のみを受け付ける実装。通信量の計測は未実施。
+  - id: attribution
+    need: 写真の出典と利用上の注意を確認できる
+    unmeasured: 画面上に国土地理院の出典・説明・注意へのリンクを表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/10-gsi-seamlessphoto/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  sources:
+    - id: gsi-seamlessphoto-mirror
+      origin: https://z.yuiseki.net/static/gsi/seamlessphoto/seamlessphoto512.pmtiles
+      license: >-
+        国土地理院コンテンツ利用規約。全国最新写真（シームレス）は他機関の画像も含むため、
+        地理院タイル一覧の備考と利用上の注意を確認する。
+  outputs: []
+  preparation:
+    - 既存の 512px JPEG PMTiles（zoom 1～17）を、外部の静的ホストから Range で直接読む
+    - ページにはデータを複製せず、ヘッダー・索引・画面内のタイルのみ取得する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D、Fetch Range、DecompressionStream
+    language: TypeScript
+    gpu: none
+    code: [examples/10-gsi-seamlessphoto/index.html, examples/10-gsi-seamlessphoto/main.ts, examples/10-gsi-seamlessphoto/pmtiles.ts]
+    dependencies: []
+    why: 写真の平面表示に必要な PMTiles v3 の索引と JPEG タイルだけを実装する
+  alternatives: []
+  not_doing: [ベクトル地図, 傾斜, 回転, 3D, 写真データの GitHub Pages への複製]
+verification:
+  checks: []
