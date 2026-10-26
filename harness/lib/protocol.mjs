@@ -4,6 +4,7 @@
 //   {"metric": name, "value": x} or {"metric": name, "values": [...]}
 //   {"mark": name}        -> harness records <name>_ms with its own clock
 //   {"info": {...}}       -> free-form facts (GPU name, vertex count, ...)
+//   {"check": id, "pass": bool, "detail": text}  -> a verification check of spec.yaml
 //   {"error": message}
 //   {"done": true}
 const PREFIX = '@mfs ';
@@ -22,6 +23,7 @@ export class Collector {
     this.metrics = {};
     this.info = {};
     this.errors = [];
+    this.checks = {};
     this.done = false;
   }
 
@@ -38,6 +40,8 @@ export class Collector {
       this.push(`${ev.mark}_ms`, timestampMs);
     } else if ('info' in ev) {
       Object.assign(this.info, ev.info);
+    } else if ('check' in ev) {
+      (this.checks[ev.check] ??= []).push({ pass: ev.pass === true, detail: ev.detail });
     } else if ('error' in ev) {
       this.errors.push(String(ev.error));
     } else if ('done' in ev) {
@@ -46,6 +50,6 @@ export class Collector {
   }
 
   result() {
-    return { metrics: this.metrics, info: this.info, errors: this.errors, done: this.done };
+    return { metrics: this.metrics, info: this.info, errors: this.errors, checks: this.checks, done: this.done };
   }
 }

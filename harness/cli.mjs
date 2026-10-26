@@ -14,7 +14,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { cpus, loadavg } from 'node:os';
 import { loadSpec } from './lib/spec.mjs';
 import { summarize } from './lib/stats.mjs';
-import { checkBudgets } from './lib/budget.mjs';
+import { checkBudgets, checkVerification } from './lib/budget.mjs';
 import { serve } from './lib/serve.mjs';
 import { measureFootprint, measureElf, checkDependencies, isSoftwareGpu } from './lib/footprint.mjs';
 import { benchNative } from './runners/native.mjs';
@@ -31,7 +31,9 @@ function allIds() {
   for (const d of SPEC_DIRS) {
     const base = join(root, d);
     if (!existsSync(base)) continue;
-    for (const id of readdirSync(base)) if (existsSync(join(base, id, 'spec.json'))) dirOf.set(id, join(base, id));
+    for (const id of readdirSync(base)) {
+      if (['spec.yaml', 'spec.json'].some((f) => existsSync(join(base, id, f)))) dirOf.set(id, join(base, id));
+    }
   }
   return [...dirOf.keys()].sort();
 }
@@ -82,6 +84,7 @@ async function bench(id, iterations) {
   if (spec.gpu === 'hardware' && isSoftwareGpu(raw.info.gpu)) raw.errors.push(`software GPU: ${raw.info.gpu}`);
   const summaries = Object.fromEntries(Object.entries(raw.metrics).map(([k, v]) => [k, summarize(v)]));
   const budgets = checkBudgets(summaries, spec.budgets);
+  const checks = checkVerification(spec.checks, raw.checks ?? {}, n);
   const prevFile = join(outDir, 'latest.json');
   const prev = existsSync(prevFile) ? JSON.parse(readFileSync(prevFile, 'utf8')) : null;
   const result = {
@@ -93,6 +96,7 @@ async function bench(id, iterations) {
     errors: raw.errors,
     summaries,
     budgets,
+    checks,
     samples: raw.metrics,
   };
   writeFileSync(join(outDir, `${result.at.replace(/[:.]/g, '-')}.json`), JSON.stringify(result, null, 1));
@@ -109,7 +113,10 @@ async function bench(id, iterations) {
     const lim = b.max !== null ? `<= ${b.max}` : `>= ${b.min}`;
     console.log(`  budget ${b.pass ? 'PASS' : 'FAIL'}  ${b.name} ${b.stat} ${fmt(b.actual)} ${lim}${b.reason ? ` (${b.reason})` : ''}`);
   }
-  return raw.errors.length === 0 && budgets.every((b) => b.pass);
+  for (const c of checks) {
+    console.log(`  check  ${c.pass ? 'PASS' : 'FAIL'}  ${c.id} (${c.reported} runs${c.reason ? `, ${c.reason}` : ''}${c.detail ? `, ${c.detail}` : ''})`);
+  }
+  return raw.errors.length === 0 && budgets.every((b) => b.pass) && checks.every((c) => c.pass);
 }
 
 async function main(argv) {
@@ -140,11 +147,13 @@ async function main(argv) {
         const r = JSON.parse(readFileSync(f, 'utf8'));
         const s = (k, st = 'p50') => r.summaries[k]?.[st];
         const spec = loadSpec(specDir(id));
-        const env = spec.runtime === 'native' ? (spec.gpu === 'none' ? 'C (MCU)' : 'C + EGL/GLES3') : (r.env.gpu ? 'WebGL2' : 'Canvas 2D');
-        const code = s('elf_text_bytes') !== undefined ? `${kb(s('elf_text_bytes'))} (.text)` : s('code_bytes') > 20000 ? `${kb(s('code_bytes'))} (実行ファイル)` : `${kb(s('code_gzip_bytes'))} gzip`;
+        const api = spec.definition?.architecture_selection?.chosen?.api?.split(/[(。]/)[0].trim();
+        const env = api && api !== 'なし' ? api
+          : (spec.runtime === 'native' ? (spec.gpu === 'none' ? 'C (MCU)' : 'C + EGL/GLES3') : (r.env.gpu ? 'WebGL2' : 'Canvas 2D'));
+        const code = s('elf_text_bytes') !== undefined ? `${kb(s('elf_text_bytes'))} (.text)` : spec.runtime === 'native' ? `${kb(s('code_bytes'))} (実行ファイル)` : `${kb(s('code_gzip_bytes'))} gzip`;
         const data = s('elf_rodata_bytes') !== undefined ? `${kb(s('elf_rodata_bytes'))} (.rodata)` : `${kb(s('data_gzip_bytes'))} gzip`;
         const passed = r.budgets.filter((b) => b.pass).length;
-        const ok = r.errors.length === 0 && passed === r.budgets.length;
+        const ok = r.errors.length === 0 && passed === r.budgets.length && (r.checks ?? []).every((c) => c.pass);
         console.log(`| ${id} | ${env} | ${code} | ${data} | ${ms(s('first_frame_ms'))} | ${ms(s('frame_ms', 'p95') ?? s('frame_interval_ms', 'p95'))} | ${ok ? '全部通過' : '未達あり'} ${passed}/${r.budgets.length} |`);
       }
       return 0;

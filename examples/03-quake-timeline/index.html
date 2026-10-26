@@ -95,8 +95,8 @@ if (new URLSearchParams(location.search).has('bench')) {
   const tq = (Date.UTC(2025, 2, 28, 6, 20, 52) - T0) / 60000;
   const before = at(tq - 1440), after = at(tq + 30);
   emit({ info: { myanmar_before: before.join(','), myanmar_after: after.join(',') } });
-  if (!(before[0] < 230 && Math.abs(before[0] - before[1]) < 20)) emit({ error: `Myanmar a day before should be plain land, got ${before}` });
-  if (!(after[0] > 150 && after[1] < 120)) emit({ error: `Myanmar half an hour after should be red, got ${after}` });
+  emit({ check: 'myanmar-before', pass: before[0] < 230 && Math.abs(before[0] - before[1]) < 20, detail: before.join(',') });
+  emit({ check: 'myanmar-after', pass: after[0] > 150 && after[1] < 120, detail: after.join(',') });
 
   // Leave the Kamchatka M8.8 a few hours old on screen for the screenshot.
   setTime((Date.UTC(2025, 6, 30, 3) - T0) / 60000);

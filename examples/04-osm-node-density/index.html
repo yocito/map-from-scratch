@@ -54,7 +54,7 @@ if (new URLSearchParams(location.search).has('bench')) {
   let sum = 0, max = 0;
   for (let i = 0; i < px.length; i += 4) { sum += px[i]; max = Math.max(max, px[i]); }
   emit({ info: { counted: sum, max_per_pixel: max } });
-  if (sum !== map.points) emit({ error: `counted ${sum} points, expected ${map.points}` });
+  emit({ check: 'count-conservation', pass: sum === map.points, detail: `${sum} of ${map.points}` });
 
   // What reaches the screen: around Shibuya station the colour must not be
   // the empty background, and somewhere it must reach the bright end.
@@ -66,8 +66,8 @@ if (new URLSearchParams(location.search).has('bench')) {
   let brightest = 0;
   for (let i = 0; i < shown.length; i += 4) brightest = Math.max(brightest, shown[i + 1]);
   emit({ info: { centre_rgb: [...shown.subarray(mid, mid + 3)].join(','), brightest_green: brightest } });
-  if (shown[mid] < 20 && shown[mid + 1] < 20) emit({ error: 'Shibuya station is drawn as empty' });
-  if (brightest < 200) emit({ error: `nothing reaches the bright end of the ramp (max green ${brightest})` });
+  emit({ check: 'shibuya-not-empty', pass: !(shown[mid] < 20 && shown[mid + 1] < 20), detail: [...shown.subarray(mid, mid + 3)].join(',') });
+  emit({ check: 'ramp-reaches-bright', pass: brightest >= 200, detail: `max green ${brightest}` });
   emit({ done: true });
 }
 </script>

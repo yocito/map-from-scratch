@@ -1,7 +1,7 @@
 // Raw data shared by the examples, converted once into data/raw/.
 // Each source names a local copy (used when present, e.g. on yuisekin-z) and
 // where the same file comes from otherwise. Bake steps call source(name).
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -25,6 +25,13 @@ const SOURCES = {
     remote: '/vsizip//vsicurl/https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_1_states_provinces.zip',
     ogr: ['-where', "adm0_a3 = 'JPN'", '-select', 'iso_3166_2,name,name_ja,region'],
   },
+  // Natural Earth 10m populated places, v5.1.2 (7,342 places). Public domain.
+  'ne-populated-places': {
+    out: 'ne_10m_populated_places.geojson',
+    local: '/sata_hdd_24tb/yuisekinai-data/gazetteer/ne_pp/ne_10m_populated_places.shp',
+    remote: '/vsizip//vsicurl/https://naciscdn.org/naturalearth/10m/cultural/ne_10m_populated_places.zip',
+    ogr: ['-select', 'NAME,NAME_JA,ADM0NAME,ADM0_A3,POP_MAX'],
+  },
   // USGS ComCat, 2025, M4.5+. Public domain (US Government work).
   'usgs-quakes-2025': {
     out: 'usgs_2025_m45.geojson',
@@ -45,11 +52,16 @@ export function source(name) {
   const s = SOURCES[name];
   if (!s) throw new Error(`unknown source ${name}`);
   const out = join(rawDir, s.out);
-  if (existsSync(out)) return out;
+  // The conversion settings are kept next to the output; when they change
+  // (another -select, a new remote) the file is converted again.
+  const stamp = `${out}.source.json`;
+  const settings = JSON.stringify({ local: s.local, remote: s.remote, ogr: s.ogr, copy: s.copy });
+  if (existsSync(out) && existsSync(stamp) && readFileSync(stamp, 'utf8') === settings) return out;
   mkdirSync(rawDir, { recursive: true });
   const from = existsSync(s.local) ? s.local : s.remote;
   if (!from) throw new Error(`${name}: no local copy at ${s.local} and no remote`);
   console.log(`source ${name} <- ${from}`);
+  rmSync(out, { force: true });
   if (s.copy && from === s.local) {
     copyFileSync(from, out);
   } else if (s.copy) {
@@ -57,6 +69,7 @@ export function source(name) {
   } else {
     execFileSync('ogr2ogr', ['-f', 'GeoJSON', '-t_srs', 'EPSG:4326', '-lco', 'COORDINATE_PRECISION=6', ...(s.ogr ?? []), out, from], { stdio: 'inherit' });
   }
+  writeFileSync(stamp, settings);
   return out;
 }
 

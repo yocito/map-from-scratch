@@ -1,6 +1,6 @@
 ---
 name: map-from-scratch
-description: Build the smallest, fastest map renderer for one request ("I want to do X, so make me a map"), almost from scratch, and prove it with measurements. Use when someone wants a map front end for a specific purpose, data set, device or performance target, rather than a general-purpose map engine.
+description: Build the smallest, fastest map renderer for one request ("I want to do X, so make me a map"), almost from scratch, drawing on the map engines collected in ref-repos, and prove it with measurements. Use when someone wants a map front end for a specific purpose, data set, device or performance target, rather than a general-purpose map engine.
 argument-hint: "[the request: what the map is for, on what device, with what data]"
 ---
 
@@ -8,39 +8,50 @@ argument-hint: "[the request: what the map is for, on what device, with what dat
 
 A general map engine pays for every feature it might need. A renderer made for
 one request pays only for that request. This skill writes such a renderer in
-`examples/<nn>-<slug>/` of the map-from-scratch repository, measures it with
-the harness, and keeps changing it until the numbers say it is small and fast
-enough for what was asked.
+`examples/<nn>-<slug>/` of the map-from-scratch repository, defines it in
+`spec.yaml`, measures it with the harness, and keeps changing it until the
+numbers say it is small and fast enough for what was asked.
 
 Repository: `~/Workspaces/repos/__yuiseki/map-from-scratch` (below: the repo).
 Everything runs in Docker through `bin/mfs`; the host needs only docker and,
-for GPU examples, the nvidia container runtime.
+for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
 
 ## Rules
 
 - One request, one renderer. Do not grow an earlier example into a shared
   engine. Copy the closest example and cut it down.
-- No external dependencies, except earcut (vendored in `vendor/earcut`) for
-  polygon triangulation. Platform APIs (Canvas 2D, WebGL2, WebGPU, EGL/GLES,
-  X11, libc) are not dependencies. A general engine may appear only under
-  `baselines/`, to measure against.
+- Learn from the engines in `ref-repos/` (MapLibre GL JS and Native, Cesium,
+  deck.gl, OpenLayers, QGIS, Mapnik, Organic Maps, ortho-earth and ~40 more;
+  `ref-repos/clone.sh` fetches them). Read how they solve the sub-problem in
+  front of you, then write only the part this request needs. Code under GPL-3,
+  GPL-2.0-or-later, LGPL or a permissive licence may be adapted with a comment
+  naming the source file; GPL-2.0-only code (GeoServer, parts of Navit) may be
+  read but not copied. Check the repository's own licence files.
+- No external dependencies at run time, except earcut (vendored in
+  `vendor/earcut`) for polygon triangulation. Platform APIs (Canvas 2D,
+  WebGL2, WebGPU, EGL/GLES, X11, libc) are not dependencies. A general engine
+  may appear only under `baselines/`, to measure against.
 - Do the work at bake time, not at run time: projection, simplification,
   triangulation, draw order, quantisation and compression all happen in
   `bake.mjs`. The renderer receives data laid out for exactly what it draws.
-- Every requirement becomes a number in `spec.json` `budgets`, with its
-  reason in `REQUEST.md`. A requirement that cannot be measured is written
-  down as such, not dropped.
-- Every bench has a functional check that reads back what reached the
-  screen. Fast numbers from a renderer that draws nothing are worthless, and
-  this has happened (see references/pitfalls.md).
+- Every requirement becomes a budget in `spec.yaml`, or says why it is not
+  measured. The harness refuses a definition that leaves one out.
+- Every bench has functional checks, defined in `spec.yaml` and reported by
+  id, that read back what reached the screen. Fast numbers from a renderer
+  that draws nothing are worthless, and this has happened
+  (references/pitfalls.md).
 
 ## Procedure
 
-1. **Read the request into REQUEST.md.** Quote the request. Make a table of
-   requirement → measured number (budget), and a list of what the renderer
-   will not do (3D, tiles, labels, rotation, …). The "not do" list is where
-   most of the savings come from: say it before writing code.
-2. **Choose runtime and API from the requirements**, not from habit:
+1. **Read the request into `spec.yaml` `requirements`.** Quote the request.
+   One requirement per need, in the request's words, each with the number it
+   becomes and why (60 Hz → 16.7 ms; "page under 150 KB" → `total_gzip_bytes`).
+   Write `architecture_selection.not_doing` before any code: what the renderer
+   will not do (3D, tiles, labels, rotation, …) is where most savings come
+   from. The format of every section is in references/spec-yaml.md.
+2. **Choose runtime and API from the requirements**, not from habit, and
+   write the choice and the rejected alternatives in
+   `architecture_selection`:
 
    | When the request says | Start from |
    | --- | --- |
@@ -50,52 +61,62 @@ for GPU examples, the nvidia container runtime.
    | millions of points, recount per view | WebGL2 float target + additive blend + GPU reduction (04) |
    | desktop, no browser, instant start | C + EGL + GLES3, instanced segments, program binary cache (05) |
    | microcontroller, no FPU, little RAM | freestanding C, integers, strip rendering, data in flash (06) |
+   | thousands of points, hover for a name, whole page size-capped | WebGL2 stencil fill, CPU brute-force hover (07) |
 
    WebGPU is a valid choice for a renderer, but in this harness headless
    Chromium only gets SwiftShader for WebGPU, so a WebGPU example cannot be
    measured on the GPU here yet. Say so if you choose it.
-3. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
-   `REQUEST.md`, `spec.json`, `bake.mjs`, the renderer, and for browser
-   examples `index.html` with a `?bench` branch. Shared bake helpers are in
-   `tools/` (`sources.mjs` for raw data, `geo.mjs` for projections,
+3. **Look it up in ref-repos.** For each sub-problem of the design (line
+   joins, polygon fill, tile decoding, label placement, picking, projection,
+   globe camera), search `ref-repos/` (`rg -l` by concept, then read the few
+   files that implement it) and note in `performance_knowledge` or a code
+   comment which engine's approach you took or rejected and why.
+4. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
+   `spec.yaml`, `REQUEST.md` (the narrative: design and what was learnt),
+   `bake.mjs`, the renderer, and for browser examples `index.html` plus a
+   `bench.js` loaded only under `?bench` (07 does this; earlier examples keep
+   the bench in `index.html`). Count in `chosen.code` exactly what a user
+   downloads. Shared bake helpers are in `tools/` (`sources.mjs` for raw data,
+   converted again when its settings change; `geo.mjs` for projections,
    simplification, triangulation, clipping); add to them with tests.
-4. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)
+5. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)
    and look at them: an outlier bounding box or a 10x larger file than
-   expected is a bug in the bake, not a fact about the data.
-5. **Write the renderer**, smallest first: get one frame on screen, then add
-   interaction. The patterns that worked are in references/patterns.md.
-6. **Write the bench branch**: first frame, a camera path (`zoomPath` in
-   `harness/page/bench.js`, or the C equivalent), fixed views for the cheap
-   and expensive ends, interaction costs (pick, redraw), and the functional
-   checks. Report the GPU (`info.gpu`) so a software fallback is caught.
-7. **Measure**: `bin/mfs bench <nn>`, then look at
+   expected is a bug in the bake, not a fact about the data. Write the steps
+   in `datasets.preparation`.
+6. **Write the renderer**, smallest first: get one frame on screen, then add
+   interaction. Patterns that worked are in references/patterns.md; the
+   browser plumbing (DPR-aware ResizeObserver, pointer to device pixels,
+   one pending rAF) is easiest to copy from 02 or 07.
+7. **Write the bench**: first frame (say exactly when it starts and stops in
+   `benchmarks.scenarios`; do not count loading the bench code), a camera
+   path (`zoomPath` and `benchFrames` in `harness/page/bench.js`, or the C
+   equivalent), fixed views for the cheap and expensive ends
+   (`benchFrames(gl, n, draw, {prefix: 'whole_'})` reports `whole_frame_ms`),
+   interaction costs, and every check of `verification.checks` as
+   `emit({check: id, pass, detail})`. Report the GPU (`info.gpu`).
+8. **Measure**: `bin/mfs bench <nn>`, then look at
    `results/<id>/screenshot.png`. Before believing a number, ask what it
-   measures (references/pitfalls.md). Change one thing at a time; for a
+   measures (references/pitfalls.md); note the machine's load, which moves
+   time budgets far more than GPU time. Change one thing at a time; for a
    parameter sweep pass it through `MFS_PAGE_QUERY` and compare runs.
-8. **Record** what was learnt in REQUEST.md under 計測で分かったこと, with
-   the numbers, including the dead ends and the corrected mistakes.
-9. **Optionally compare** with a general engine under `baselines/` (see
+9. **Record** what was learnt in `performance_knowledge` (finding, evidence
+   with numbers, when it applies), including dead ends and corrected mistakes.
+10. **Optionally compare** with a general engine under `baselines/` (see
    `baselines/b02-maplibre`): same data, same viewport, same camera path.
-10. **Commit** when tests pass and all budgets pass: `bin/mfs test`, then
-    `bin/mfs bench <nn>`. `bin/mfs report` prints every example's latest
-    numbers for the README.
+11. **Commit** when `bin/mfs test` passes and `bin/mfs bench <nn>` passes all
+   budgets and checks. `bin/mfs report` prints every example's latest numbers
+   for the README.
 
 ## Harness reference
 
 - `bin/mfs image | test | list | bake <id> | build <id> | bench <id|all> [-n N] | report | serve [port] | probe [lifetime]`
+- `spec.yaml` (references/spec-yaml.md) is read by `harness/lib/spec.mjs`;
+  the harness takes runtime, page or command, viewport, throttle, iterations,
+  bake and build commands, shipped files, budgets and check ids from it.
 - Renderers report with one JSON object per line prefixed `@mfs `
   (native: stdout; browser: `window.__mfsEmit`): `{"metric":name,"value":x}`,
-  `{"metric":name,"values":[…]}`, `{"mark":name}` (native; the harness
-  timestamps it from process start), `{"info":{…}}`, `{"error":msg}`,
+  `{"metric":name,"values":[…]}`, `{"mark":name}` (native; timed from fork),
+  `{"check":id,"pass":bool,"detail":…}`, `{"info":{…}}`, `{"error":msg}`,
   `{"done":true}`.
-- The harness adds: footprint (`code_bytes`, `code_gzip_bytes`, `data_bytes`,
-  `data_gzip_bytes`, or `elf_text_bytes`, `elf_rodata_bytes`, `elf_ram_bytes`
-  for microcontroller objects), `dependencies`; for browsers `js_heap_mb`,
-  `transfer_kb`, `browser_rss_mb`; for native `wall_ms`, `process_cpu_ms`,
-  `peak_rss_mb` (from wait4).
-- `spec.json`: `id`, `request`, `runtime` (`browser`|`native`), `gpu`
-  (`hardware`|`none`), `bake`, `build`, `run` (`page` + `viewport` +
-  `cpuThrottle`, or `cmd`), `iterations`, `footprint` (`code`, `data`,
-  `elf`), `dependencies`, `budgets` (`{"metric": {"stat": "p95", "max": x}}`).
-- Results go to `results/<id>/` (latest.json, timestamped runs, screenshot,
-  chrome.log). They are not committed.
+- Results go to `results/<id>/` (latest.json with budgets and checks,
+  timestamped runs, screenshot, chrome.log). They are not committed.

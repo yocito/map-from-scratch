@@ -1,0 +1,100 @@
+id: 06-mcu-roadmap
+request: >-
+  ESP32-C6（RISC-V 160MHz、RAM 512KB、FPU なし、PSRAM なし）と 240x240 の液晶のハンディ端末で、
+  渋谷駅のまわりの道路地図をボタンでスクロール・拡大縮小したい。
+
+requirements:
+  - id: fits-ram
+    need: RAM 512 KB、PSRAM なしで動く
+    rationale: フレームバッファ全体 (240×240×2 = 115 KB) を持たず、描画器自身はグローバル変数を持たない
+  - id: no-fpu
+    need: FPU なしで動く
+    unmeasured: 整数演算だけで書いたことは verification.checks の freestanding-object (ビルド時) で確かめる
+  - id: fits-flash
+    need: フラッシュに収まる
+    rationale: ESP32-C6 のフラッシュは 4 MB 以上。描画コードとデータの両方を測る
+  - id: scroll-and-zoom
+    need: ボタンでスクロールと拡大縮小ができる
+    rationale: 実機の時間はホストでは測れない。端末でも変わらない仕事量 (書くピクセル数) と、ホストの時間を退行の見張りとして測る
+
+evaluation:
+  budgets:
+    - {metric: elf_ram_bytes, max: 0, unit: B, requirement: fits-ram}
+    - {metric: strip_buffer_bytes, max: 8192, unit: B, requirement: fits-ram}
+    - {metric: elf_text_bytes, max: 4096, unit: B, requirement: fits-flash}
+    - {metric: elf_rodata_bytes, max: 1048576, unit: B, requirement: fits-flash}
+    - {metric: pixels_written, stat: p95, max: 120000, unit: px, requirement: scroll-and-zoom}
+    - {metric: frame_ms, stat: p95, max: 1, unit: ms (host), requirement: scroll-and-zoom}
+  gates: [エラーがない, verification の check がすべて通る, ビルドが通る (freestanding-object を含む)]
+
+benchmarks:
+  runtime: native
+  cmd: [build/06-mcu-roadmap/mcumap-host]
+  iterations: 3
+  scenarios:
+    - id: walk
+      what: 5 段のズーム (scale 12, 24, 48, 96, 192) のそれぞれで、渋谷駅のまわりを 1/16 画面ずつ正方形を描くように動かす 400 フレーム。1 フレームは 16 行のストリップ 15 本
+      metrics: [frame_ms, roads_tested, segments_drawn, pixels_written]
+    - id: static
+      what: 描画器のオブジェクトを rv32imc -Os でクロスコンパイルし、llvm-size で節ごとの大きさを測る
+      metrics: [elf_text_bytes, elf_rodata_bytes, elf_ram_bytes, strip_buffer_bytes]
+
+datasets:
+  bake: [node, examples/06-mcu-roadmap/bake.mjs]
+  sources:
+    - id: osm-tokyo23
+      origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点。highway=* の way
+      license: ODbL (© OpenStreetMap contributors)
+  outputs: [data/baked/06-mcu-roadmap/roads_data.c]
+  preparation:
+    - 渋谷駅 (139.7016°E, 35.6580°N) を原点に、0.5 m 単位の局所グリッドへ投影する (x は cos(緯度) を掛ける)
+    - 駅から 3.1 km の正方形で道路を切り取り、2.5 km の範囲に掛かるものだけを残す (12,878 本、68,495 点)
+    - 道路ごとの外接矩形・最初の点・点数・種別を持つ表と、点の配列を、1 行 1 道路の C の const 配列として生成する
+    - 細い種別から順に並べる (描画順をベイク時に決める)
+
+performance_knowledge:
+  - id: tiny-renderer
+    finding: 整数演算だけの線分描画器 (Cohen–Sutherland と Bresenham と正方形のブラシ) は、RISC-V で 1 KB 未満に収まる
+    evidence: elf_text_bytes 988、elf_ram_bytes 0
+    applies_when: FPU のないマイコン
+  - id: clip-at-bake-for-int32
+    finding: ベイク時に道路を範囲のすぐ外で切り取れば、クリッピングの積が int32 に収まり、64 ビット除算 (__divdi3) が要らない
+    evidence: 描画器のオブジェクトが参照する未定義シンボルは mm_pts、mm_roads、mm_road_count だけ
+    applies_when: 座標の範囲を限れる局所地図
+  - id: bbox-tests-dominate-zoomed-in
+    finding: ズームインすると、ストリップごとに全道路の外接矩形を試す回数が、描く区間の数より 2 桁多い
+    evidence: 1 フレーム 193,170 回の試行に対して、描いた区間は 600〜2,700
+    applies_when: 実機で遅かったときの次の手 (格子 × 種別の道路リストをフラッシュにベイクする)
+
+architecture_selection:
+  chosen:
+    platform: マイコン (ESP32-C6、RISC-V rv32imc)。ホストでは同じ C を x86-64 でビルドして測る
+    api: なし (呼ぶ側が 240×16 の RGB565 ストリップを LCD へ DMA する)
+    language: C11 (freestanding、libc なし、ヒープなし、浮動小数点なし)
+    gpu: none
+    build: [sh, -c, "set -e; D=build/06-mcu-roadmap; S=examples/06-mcu-roadmap; mkdir -p $D; cc -std=c11 -O2 -Wall -Wextra -I$S -o $D/mcumap-host $S/host.c $S/mcumap.c data/baked/06-mcu-roadmap/roads_data.c; for f in $S/mcumap.c data/baked/06-mcu-roadmap/roads_data.c; do clang --target=riscv32-unknown-elf -march=rv32imc -mabi=ilp32 -Os -ffreestanding -fno-builtin -Wall -Wextra -I$S -c $f -o $D/$(basename $f .c).rv32.o; done; U=$(llvm-nm -u $D/mcumap.rv32.o | grep -v ' mm_' || true); if [ -n \"$U\" ]; then echo \"mcumap.c needs symbols beyond its data: $U\"; exit 1; fi"]
+    elf: [build/06-mcu-roadmap/mcumap.rv32.o, build/06-mcu-roadmap/roads_data.rv32.o]
+    dependencies: []
+    why: 512 KB の RAM でフレームバッファを持たずに描くには、ストリップごとに線分を描く整数の描画器が最も小さい
+  alternatives:
+    - option: LVGL などの GUI ライブラリ
+      rejected_because: 外部依存になる。地図に要るのは線分を描くことだけ
+    - option: フルフレームバッファ (115 KB)
+      rejected_because: RAM の 4 分の 1 近くを使う。ストリップ 1 本 (7.5 KB) で足りる
+    - option: 事前にラスタ化したタイル画像をフラッシュに置く
+      rejected_because: 5 段のズームと自由なスクロールの画像は、ベクトルの 480 KB よりずっと大きくなる
+  not_doing: [フルフレームバッファ, 浮動小数点, malloc, libc, アンチエイリアス, 文字, 面, タイル, 実行時のデータ読み込み]
+
+verification:
+  checks:
+    - id: motorway-point-red
+      what: データ中の最初の高速道路の点を画面中央に置くと、そのピクセルが高速道路の赤になる
+      how: その点を中心に最大ズーム (scale 192) で 15 本のストリップを描き、中央のピクセルを見る
+      expected: RGB565 0xE30B
+    - id: freestanding-object
+      what: 描画器のオブジェクトが、自分のデータ以外のシンボル (libc、libgcc の浮動小数点や 64 ビット除算) に依存しない
+      how: ビルドの最後に llvm-nm -u で未定義シンボルを並べ、mm_ で始まらないものがあればビルドを失敗させる
+      expected: 未定義シンボルは mm_pts、mm_roads、mm_road_count だけ
+      by: build
+  harness:
+    - 終了コードが 0 でなければエラーにする

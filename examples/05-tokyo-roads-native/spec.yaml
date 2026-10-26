@@ -1,0 +1,111 @@
+id: 05-tokyo-roads-native
+request: >-
+  ノート PC のデスクトップアプリとして、東京23区の道路を1本も間引かずに表示して、144Hz のモニタでカクつかずにパン・ズームしたい。
+  ブラウザは使いたくない。起動は一瞬で。
+
+requirements:
+  - id: every-road
+    need: 道路を 1 本も間引かない
+    unmeasured: データの作り方の要件。datasets.preparation で全区間を残し、verification.checks で描けていることを確かめる
+  - id: smooth-144hz
+    need: 144 Hz のモニタでカクつかずにパン・ズーム
+    rationale: 144 Hz の 1 フレーム 6.9 ms に GPU の処理まで収まること。全体表示も同じ基準
+  - id: instant-start
+    need: 起動は一瞬で
+    rationale: 初回起動 (シェーダ未キャッシュ) を含めた最悪で 300 ms
+  - id: no-browser
+    need: ブラウザを使わない
+    rationale: ネイティブの実行ファイル 1 つ。大きさも測る
+  - id: light-on-laptop
+    need: ノート PC で軽い
+    rationale: 依頼に数値はない。2 回目以降の起動の常駐メモリ p50 150 MB を目安にした
+
+evaluation:
+  budgets:
+    - {metric: frame_ms, stat: p95, max: 6.9, unit: ms, requirement: smooth-144hz}
+    - {metric: whole_frame_ms, stat: p95, max: 6.9, unit: ms, requirement: smooth-144hz}
+    - {metric: first_frame_ms, stat: max, max: 300, unit: ms, requirement: instant-start}
+    - {metric: code_bytes, max: 40000, unit: B, requirement: no-browser}
+    - {metric: peak_rss_mb, stat: p50, max: 150, unit: MB, requirement: light-on-laptop}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: native
+  cmd: [build/roads, --bench, data/baked/05-tokyo-roads-native/roads.bin]
+  iterations: 5
+  scenarios:
+    - id: start
+      what: プロセス起動 (fork の直前) から、EGL の初期化、データの読み込み、最初のフレームの glFinish まで。1 回目の反復はプログラムのキャッシュを消して初回起動にする
+      metrics: [main_ms, gl_ready_ms, first_frame_ms, rss_main_mb, rss_gl_ready_mb, rss_uploaded_mb, rss_compiled_mb, rss_first_frame_mb, program_from_cache]
+    - id: zoom-path
+      what: 23 区全体から渋谷へ 128 倍までズームして戻る 600 フレーム (1280×800、MSAA 4x のピクセルバッファ)
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+    - id: whole-view
+      what: 全体表示で止めた 60 フレーム
+      metrics: [whole_cpu_ms, whole_frame_ms, whole_gpu_ms]
+    - id: street-view
+      what: 渋谷を 128 倍で止めた 60 フレーム
+      metrics: [street_cpu_ms, street_frame_ms, street_gpu_ms]
+    - id: process
+      what: プロセス全体 (wait4 で測る)
+      metrics: [wall_ms, process_cpu_ms, peak_rss_mb]
+
+datasets:
+  bake: [node, examples/05-tokyo-roads-native/bake.mjs]
+  sources:
+    - id: osm-tokyo23
+      origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点。highway=* の way 286,195 本
+      license: ODbL (© OpenStreetMap contributors)
+  outputs: [data/baked/05-tokyo-roads-native/roads.bin]
+  preparation:
+    - osmium tags-filter で highway=* の way だけを取り出し、LineString にする
+    - 種別を 5 段 (高速、主要、二次・三次、生活、歩道など) に分ける
+    - 139.50–139.98°E、35.48–35.85°N の正方グリッドで 16 ビットに量子化する (約 0.6 m)
+    - 細い種別から順に並べる (描画順をベイク時に決める)。道路の終わりの頂点は種別 255 にする
+
+performance_knowledge:
+  - id: instanced-segments
+    finding: 区間を 4 頂点のストリップのインスタンスにして頂点シェーダで幅を付けると、全道路網が 1 回のドローコールで描ける。頂点配列を 1 頂点ずらして 2 つの属性として読めば、区間リストもいらない
+    evidence: 120 万区間で frame_ms p95 1.1 ms、表示範囲によらず一定
+    applies_when: 大量の折れ線を一定の太さで描くとき
+  - id: program-binary-cache
+    finding: リンク済みのプログラムを glProgramBinary で保存して次回読むと、NVIDIA の GLSL コンパイラを読み込まずに済む
+    evidence: 常駐メモリが約 58 MB 減り (166 MB → 124 MB)、最初のフレームが 183 ms → 107 ms
+    applies_when: 起動の速さか常駐メモリを気にするネイティブの GL アプリ
+  - id: driver-dominates-memory
+    finding: 常駐メモリの大半はドライバのもので、描画器自身が持つのはデータのアップロード分くらい
+    evidence: 起動時 2.7 MB、EGL と GL の初期化で 93 MB、アップロードで +7 MB、コンパイルで +59 MB、最初の描画で +18 MB
+    applies_when: ネイティブの描画器のメモリ予算を決めるとき
+  - id: vertex-bound
+    finding: 120 万インスタンスでは頂点処理が支配的で、表示範囲 (ラスタ化の量) はほとんど影響しない
+    evidence: 全体表示 1.07 ms、街区表示 1.03 ms
+    applies_when: インスタンス数を減らす工夫 (LOD) を考えるとき
+
+architecture_selection:
+  chosen:
+    platform: native (Linux)
+    api: EGL + OpenGL ES 3.0。ウィンドウは Xlib、ベンチは EGL device platform のピクセルバッファ
+    language: C11
+    gpu: hardware
+    build: [sh, -c, mkdir -p build && cc -std=c11 -D_GNU_SOURCE -O2 -s -Wall -Wextra -o build/roads examples/05-tokyo-roads-native/roads.c -lEGL -lGLESv2 -lX11 -lm]
+    code: [build/roads]
+    dependencies: []
+    why: ブラウザなしで起動を速くするには、OS の GL を直接呼ぶ小さな実行ファイルが最も短い。GLES3 にはインスタンス描画がある
+  alternatives:
+    - option: Rust + wgpu
+      rejected_because: 外部依存になる (wgpu とその依存)。外部依存は earcut だけという決まりに反する
+    - option: Vulkan を直接
+      rejected_because: 同じことをするコードが数倍になる。この描画に Vulkan の自由度は要らない
+    - option: Electron などの組み込みブラウザ
+      rejected_because: 依頼が「ブラウザは使いたくない」。起動時間と常駐メモリも増える
+  not_doing: [ラベル, アイコン, 建物, 面, タイル, LOD, 間引き, 回転, 3D, ウィンドウツールキット]
+
+verification:
+  checks:
+    - id: motorway-vertex-red
+      what: データ中の最初の高速道路の頂点を画面中央に置くと、そのピクセルが高速道路の赤になる
+      how: その頂点を中心に 128 倍で描き、画面中央のピクセルを読み戻す
+      expected: 赤 (R > 180 かつ G < 140)
+  harness:
+    - info.gpu がソフトウェア描画 (llvmpipe など) ならエラーにする
+    - 終了コードが 0 でなければエラーにする

@@ -1,0 +1,120 @@
+id: 02-world-population-mobile
+request: >-
+  スマホで、世界の国を人口で塗り分けた地図をピンチで拡大して、タップした国の名前と人口を出したい。
+
+requirements:
+  - id: light-on-phone
+    need: スマホの回線で開ける重さ
+    rationale: data gzip 600 KB は 4G (約 5 Mbps) でおよそ 1 秒
+  - id: phone
+    need: スマホで動く
+    unmeasured: 端末そのものではなく、benchmarks の画面と CPU 4 倍スロットルで代わりに測る
+  - id: smooth-pinch
+    need: ピンチの拡大縮小が滑らか
+    rationale: 60 Hz の 1 フレーム 16.7 ms に GPU の処理まで収まること
+  - id: quick-tap
+    need: タップした国がすぐ出る
+  - id: quick-start
+    need: 開いてすぐ地図が出る
+  - id: right-country
+    need: タップした場所の国を正しく答える
+    unmeasured: 時間ではなく正しさの要件なので verification.checks で確かめる
+
+evaluation:
+  budgets:
+    - {metric: code_gzip_bytes, max: 4000, unit: B, requirement: light-on-phone}
+    - {metric: data_gzip_bytes, max: 600000, unit: B, requirement: light-on-phone}
+    - {metric: first_frame_ms, stat: p50, max: 1500, unit: ms, requirement: quick-start}
+    - {metric: frame_ms, stat: p95, max: 16.7, unit: ms, requirement: smooth-pinch}
+    - {metric: pick_ms, stat: p95, max: 8, unit: ms, requirement: quick-tap}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/02-world-population-mobile/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 3, mobile: true}
+  cpu_throttle: 4
+  iterations: 5
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、最初の描画を readPixels で GPU 完了まで待った時刻まで
+      metrics: [first_frame_ms]
+    - id: pinch-path
+      what: 世界全体から日本へ 32 倍までズームして戻る 300 フレーム (少しずつパンしながら)
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+    - id: taps
+      what: 世界全体の表示で、擬似乱数の 200 点をタップ
+      metrics: [pick_ms]
+
+datasets:
+  bake: [node, examples/02-world-population-mobile/bake.mjs]
+  sources:
+    - id: ne-countries
+      origin: Natural Earth 10m Admin 0 countries v5.1.1 (258 件、548,471 点)
+      license: Public domain
+  outputs:
+    - data/baked/02-world-population-mobile/world.bin
+    - data/baked/02-world-population-mobile/countries.json
+  preparation:
+    - Equal Earth で投影し、32 倍ズームの 1.5 デバイス px を許容誤差として単純化する (135,150 頂点)
+    - earcut で三角形分割する (127,820 三角形)
+    - 世界の外接矩形で 16 ビットに量子化する (1 刻み約 0.3 km)
+    - 座標と三角形インデックスを前の値との差分で保存し、国境線はリングの頂点数だけを保存する
+
+performance_knowledge:
+  - id: delta-coding
+    finding: 座標とインデックスを差分 (2^16 と 2^32 で折り返す) にし、国境線をリングの長さから作り直すと、gzip 後のデータが 3 分の 1 になる
+    evidence: data gzip 1.32 MB から 474 KB
+    applies_when: 頂点が地物ごとに連続して並ぶデータ
+  - id: id-pick-one-pixel
+    finding: カメラの中心をタップ位置にして 1×1 の FBO に ID を描けば、当たり判定は 1 ピクセルのラスタ化と読み戻しで済む
+    evidence: pick_ms p95 0.9 ms (4 倍スロットル)
+    applies_when: 面の地物を GPU で描いていて、CPU 側にジオメトリを持ちたくないとき
+  - id: vulkan-from-angle
+    finding: Chromium に VulkanFromANGLE を付けると GPU プロセスが起動直後に落ち、それより前の WebGL コンテキストが失われる
+    evidence: 当たり判定が全部 0 を返した。フラグを外すと起きない
+    applies_when: ハーネスの Chromium のフラグを変えるとき
+  - id: maplibre-baseline
+    finding: 同じ依頼を MapLibre GL JS 5.24.0 で作ると、配るコードが 83 倍、初回描画が 5 倍になる
+    evidence: baselines/b02-maplibre (code gzip 286 KB、first_frame p50 1,144 ms)
+    applies_when: 汎用エンジンと比べるとき
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2
+    language: JavaScript (ES modules、ビルドなし)
+    gpu: hardware
+    code: [examples/02-world-population-mobile/map.js]
+    dependencies: []
+    why: 13 万頂点を 32 倍ズームまで滑らかに動かすので GPU で描く。WebGL2 ならスマホのブラウザで広く動く
+  alternatives:
+    - option: Canvas 2D
+      rejected_because: 比べていない。13 万頂点のパスを毎フレーム描き直すと、スロットル下の 16.7 ms に収まらないと見込んだ
+    - option: WebGPU
+      rejected_because: スマホのブラウザの対応がまだ限られる。このハーネスでは headless Chromium の WebGPU が SwiftShader になり、GPU で測れない
+    - option: MapLibre GL JS
+      rejected_because: 汎用エンジン。比較のための baselines/b02-maplibre に置いた
+  not_doing: [3D, 地球儀, 回転, タイル, 地図上の文字 (名前と人口は DOM のパネル), 実行時の投影計算, 連続アニメーション]
+
+verification:
+  checks:
+    - id: pick-tokyo
+      what: 東京 (139.7°E, 35.7°N) の位置の当たり判定が日本を返す
+      how: 世界全体の表示で、その経緯度の画面上の位置で pick を呼ぶ
+      expected: JPN
+    - id: pick-paris
+      what: パリ (2.35°E, 48.86°N) の位置がフランスを返す
+      how: 同上
+      expected: FRA
+    - id: pick-brasilia
+      what: ブラジリア (47.9°W, 15.8°S) の位置がブラジルを返す
+      how: 同上
+      expected: BRA
+    - id: pick-pacific
+      what: 太平洋の真ん中 (150°W, 0°) は国を返さない
+      how: 同上
+      expected: null
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画 (SwiftShader、llvmpipe) ならエラーにする

@@ -78,7 +78,7 @@ if (new URLSearchParams(location.search).has('bench')) {
   }
   emit({ metric: 'pick_ms', values: tap });
   const jp = map.queryRenderedFeatures(map.project([139.7, 35.7]), { layers: ['fill'] })[0];
-  if (jp?.properties.code !== 'JPN') emit({ error: `pick at Tokyo: got ${jp?.properties.code}` });
+  emit({ check: 'pick-tokyo', pass: jp?.properties.code === 'JPN', detail: String(jp?.properties.code) });
   map.jumpTo({ center: [138, 37], zoom: Z0 + Math.log2(6) });
   await new Promise((r) => map.once('idle', r));
   emit({ done: true });

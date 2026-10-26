@@ -6,7 +6,9 @@
 
 - 言語、描画 API、ランタイムは依頼に合わせて選ぶ (Canvas 2D、WebGL2、C + EGL/GLES3、マイコン向けの C など)。
 - 外部ライブラリは使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
-- 要件はすべて、測定値の上限や下限 (予算。`spec.json` の `budgets`) にし、ハーネスが毎回測って合否を出す。
+- 各例を `spec.yaml` で定義する。要件 (requirements)、評価 (evaluation)、計測 (benchmarks)、データ (datasets)、性能の知見 (performance_knowledge)、構成の選択 (architecture_selection)、検証 (verification) の 7 節からなる。
+- 要件はすべて、測定値の上限や下限 (予算) にし、ハーネスが毎回測って合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。
+- 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 47) の解き方を読んで参考にする。
 
 ## 例
 
@@ -18,8 +20,9 @@
 | [04-osm-node-density](examples/04-osm-node-density/REQUEST.md) | 東京 23 区の OSM 全ノード 966 万点の密度を、画面解像度で毎回数え直す | WebGL2 |
 | [05-tokyo-roads-native](examples/05-tokyo-roads-native/REQUEST.md) | ブラウザなしのデスクトップアプリで 23 区の全道路を 144 Hz で | C + EGL + OpenGL ES 3.0 |
 | [06-mcu-roadmap](examples/06-mcu-roadmap/REQUEST.md) | ESP32-C6 と 240×240 液晶で渋谷駅周辺の道路地図 (FPU なし) | C (freestanding、RISC-V) |
+| [07-world-cities-hover](examples/07-world-cities-hover/REQUEST.md) | 世界の都市 7,342 を人口の大きさの点で、マウスを乗せると名前と人口。ページ全体で gzip 150 KB 以内 | WebGL2 |
 
-各例の `REQUEST.md` に、依頼の原文、要件を数値にした予算、やらないこと、設計、計測で分かったことを書いてあります。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
 
 ## 計測結果
 
@@ -33,9 +36,12 @@
 | 04-osm-node-density | WebGL2 | 3086 B gzip | 17135 KB gzip | 275 ms | 2.38 ms | 全部通過 5/5 |
 | 05-tokyo-roads-native | C + EGL/GLES3 | 23 KB (実行ファイル) | 5357 KB gzip | 106 ms | 1.08 ms | 全部通過 5/5 |
 | 06-mcu-roadmap | C (MCU) | 988 B (.text) | 469 KB (.rodata) | - | 0.376 ms | 全部通過 6/6 |
+| 07-world-cities-hover | WebGL2 | 4504 B gzip | 129 KB gzip | 184 ms | 3.27 ms | 全部通過 7/7 |
 
 - フレームの列は、WebGL2 とネイティブでは GPU の処理が終わるまで待った 1 フレームの時間です。01 はホバー中の rAF フレーム間隔、06 はホスト CPU での時間で、マイコン実機の時間ではありません。
 - 01 と 02 はスマホ相当 (390×844、DPR 3、CPU 4 倍スロットル) で測っています。
+- 07 は別の処理で機械が混んでいたとき (load average 60 以上) に測りました。混んでいると時間の値は 1.5〜2 倍になり、GPU 時間はほとんど変わりません。
+- この表のほかに、各例の検証の項目 (verification) もすべての反復で通っています。
 
 ### 汎用エンジンとの比較
 
@@ -59,6 +65,7 @@ MapLibre は Web メルカトルで描くので、投影法は 02 (Equal Earth) 
 ホストに要るのは Docker と、GPU を使う例では nvidia container runtime だけです。ハーネス (依存なしの Node 24)、C のビルド、Chromium、データ準備 (GDAL、osmium) はすべてコンテナの中で動きます。
 
 ```sh
+ref-repos/clone.sh     # 参照する地図エンジンを集める (浅いクローン、約 8 GB)
 bin/mfs image          # ベースイメージを作る
 bin/mfs test           # ハーネスとベイク用ヘルパのテスト
 bin/mfs bake all       # データを用意する (原データの場所は tools/sources.mjs)
@@ -68,7 +75,7 @@ bin/mfs report         # 最新の結果を Markdown の表で出す
 bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:8080/examples/
 ```
 
-新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
+新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
 
 ## ハーネス
 
@@ -84,3 +91,7 @@ bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:808
 - OpenStreetMap、東京 23 区、2026-08-31 時点。© OpenStreetMap contributors、ODbL。
 
 ベイクしたデータと計測結果はリポジトリに入れていません (`data/`、`results/`)。
+
+## ライセンス
+
+GPL-3.0-or-later です ([LICENSE](LICENSE))。`ref-repos/` の GPL のエンジン (QGIS、ortho-earth など) の解き方を取り入れるためです。`vendor/earcut` は earcut の ISC ライセンスのままです。`ref-repos/` の中身はこのリポジトリに含めず、`ref-repos/clone.sh` で取得します。それぞれのライセンスは各リポジトリのファイルに従います。

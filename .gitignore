@@ -3,3 +3,5 @@ node_modules/
 results/
 data/
 build/
+ref-repos/*
+!ref-repos/clone.sh

@@ -357,7 +357,8 @@ static int run_bench(const char *data) {
   unsigned char px[4];
   glReadPixels(R.width / 2, R.height / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
   printf("@mfs {\"info\":{\"motorway_rgb\":\"%d,%d,%d\"}}\n", px[0], px[1], px[2]);
-  if (!(px[0] > 180 && px[1] < 140)) printf("@mfs {\"error\":\"a motorway vertex is not drawn red (%d,%d,%d)\"}\n", px[0], px[1], px[2]);
+  printf("@mfs {\"check\":\"motorway-vertex-red\",\"pass\":%s,\"detail\":\"%d,%d,%d\"}\n",
+         px[0] > 180 && px[1] < 140 ? "true" : "false", px[0], px[1], px[2]);
 
   const char *out = getenv("MFS_OUT");
   cam.x = shx; cam.y = shy; cam.zoom = 24.0f;

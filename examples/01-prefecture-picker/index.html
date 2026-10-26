@@ -75,7 +75,7 @@ if (new URLSearchParams(location.search).has('bench')) {
   const got = new Promise((res) => el.addEventListener('prefecture', (e) => res(e.detail.code), { once: true }));
   el.querySelector('canvas').dispatchEvent(new MouseEvent('click', { clientX: r.left + at[0], clientY: r.top + at[1], bubbles: true }));
   const code = await got;
-  if (code !== 'JP-13') emit({ error: `click inside Tokyo announced ${code}` });
+  emit({ check: 'click-tokyo', pass: code === 'JP-13', detail: code });
   emit({ done: true });
 }
 </script>

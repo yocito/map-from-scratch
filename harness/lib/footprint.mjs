@@ -23,6 +23,7 @@ export function measureFootprint(root, { code = [], data = [] }) {
     code_gzip_bytes: gz(codeBufs),
     data_bytes: dataBufs.reduce((a, b) => a + b.length, 0),
     data_gzip_bytes: gz(dataBufs),
+    total_gzip_bytes: gz(codeBufs) + gz(dataBufs),
   };
 }
 

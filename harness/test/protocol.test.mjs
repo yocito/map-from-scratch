@@ -43,3 +43,10 @@ test('an error event is kept and makes the run failed', () => {
   c.add({ error: 'no WebGPU adapter' });
   assert.deepEqual(c.result().errors, ['no WebGPU adapter']);
 });
+
+test('check events are collected per id', () => {
+  const c = new Collector();
+  c.add({ check: 'pick-tokyo', pass: true, detail: 'JPN' });
+  c.add({ check: 'pick-tokyo', pass: false, detail: 'IDN' });
+  assert.deepEqual(c.result().checks['pick-tokyo'], [{ pass: true, detail: 'JPN' }, { pass: false, detail: 'IDN' }]);
+});

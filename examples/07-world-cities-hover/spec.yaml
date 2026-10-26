@@ -1,0 +1,144 @@
+id: 07-world-cities-hover
+request: >-
+  世界の都市（Natural Earth の populated places、約 7,300 都市）を人口に応じた大きさの点で表示して、
+  マウスを乗せた都市の名前と人口を出したい。ノート PC のブラウザで使う。ページ全体（コードとデータ）で gzip 150 KB 以内にしたい。
+
+# SKILL.md だけを読んだエージェントが作った例 (スキルの検証)。
+requirements:
+  - id: page-150kb
+    need: ページ全体 (コードとデータ) で gzip 150 KB 以内
+  - id: laptop
+    need: ノート PC のブラウザで使う
+    unmeasured: 端末ではなく、benchmarks の画面 (1280×800、DPR 2) と CPU 2 倍スロットルで代わりに測る
+  - id: quick-start
+    need: すぐ出る
+  - id: smooth
+    need: 動かしても引っかからない
+    rationale: ズームとパンは依頼にないが、世界全体では 72% の都市しか上に出ないので入れた。120 Hz の 8.3 ms
+  - id: quick-hover
+    need: マウスを乗せたらすぐ名前と人口が出る
+  - id: every-city
+    need: 約 7,300 都市のどれにでもマウスを乗せられる
+  - id: correct
+    need: 正しく出ている
+    unmeasured: verification.checks で確かめる
+
+evaluation:
+  budgets:
+    - {metric: total_gzip_bytes, max: 150000, unit: B, requirement: page-150kb}
+    - {metric: first_frame_ms, stat: p50, max: 400, unit: ms, requirement: quick-start}
+    - {metric: frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth}
+    - {metric: whole_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth}
+    - {metric: deep_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth}
+    - {metric: hover_ms, stat: p95, max: 1, unit: ms, requirement: quick-hover}
+    - {metric: reachable_ratio, stat: min, min: 0.99, requirement: every-city}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/07-world-cities-hover/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 2, mobile: false}
+  cpu_throttle: 2
+  iterations: 5
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、mount が返って最初の描画が終わった時刻まで (計測用コードの読み込みは含めない)
+      metrics: [first_frame_ms]
+    - id: zoom-path
+      what: 世界全体から欧州へ 32 倍までズームして戻る 300 フレーム
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+    - id: whole-view
+      what: 世界全体で止めた視点
+      metrics: [whole_frame_ms]
+    - id: deep-view
+      what: 欧州 32 倍で止めた視点
+      metrics: [deep_frame_ms]
+    - id: hover
+      what: 当たり判定とツールチップの更新
+      metrics: [hover_ms]
+    - id: reachability
+      what: 各都市を 32 倍で画面中央に置いたとき、中央で拾われるのがその都市である割合
+      metrics: [reachable_ratio]
+
+datasets:
+  bake: [node, examples/07-world-cities-hover/bake.mjs]
+  sources:
+    - id: ne-populated-places
+      origin: Natural Earth 10m populated places v5.1.2 (7,342 都市)
+      license: Public domain
+    - id: ne-countries
+      origin: Natural Earth 10m Admin 0 countries v5.1.1 (陸と国名)
+      license: Public domain
+  outputs:
+    - data/baked/07-world-cities-hover/land.bin
+    - data/baked/07-world-cities-hover/cities.bin
+    - data/baked/07-world-cities-hover/names.bin
+  preparation:
+    - 国を ogr2ogr (ST_Union) で 1 つの陸に溶かしてから Equal Earth で投影・単純化し、リングの頂点と頂点数だけを持つ
+    - 都市は大きい点から先、同じ半径の中は Morton 順に並べる (描画順と gzip のため)
+    - 半径は √人口に比例させ、0.1 px 単位の 1 バイトにする
+    - 名前は UTF-16LE のテキスト 1 本 (国名、空行、都市名)
+
+performance_knowledge:
+  - id: dissolve-land
+    finding: 国を 1 つの陸に溶かすと、共有境界を 2 回配らずに済む
+    evidence: 陸のデータ 62 KB → 43 KB
+    applies_when: 国境を描かず陸の形だけが要るとき
+  - id: stencil-even-odd
+    finding: 三角形分割せず、リングごとの扇をステンシル INVERT で偶奇塗りすれば、インデックスを配らずに済み、穴も抜ける
+    evidence: 陸のデータ 88 KB → 43 KB (gzip)
+    applies_when: 塗りだけで、地物ごとの色分けが要らないとき
+  - id: icu-first-call
+    finding: 最初の toLocaleString('ja-JP') は ICU の初期化で 30 ms 以上かかる
+    evidence: 単独で 34 ms、2 回目は 0.17 ms。正規表現の 3 桁区切りにして hover_ms の外れ値が消えた
+    applies_when: 操作に即応すべき箇所で数値を整形するとき
+  - id: brute-force-hover
+    finding: 7,342 件なら、当たり判定は CPU の総当たりで足りる
+    evidence: hover_ms p95 0.25〜0.3 ms
+    applies_when: 点が 1 万件程度まで
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2 (ステンシル)
+    language: JavaScript (ES modules、ビルドなし)
+    gpu: hardware
+    code: [examples/07-world-cities-hover/index.html, examples/07-world-cities-hover/cities.js]
+    dependencies: []
+    why: 7,342 個の円と陸を、ズームしても滑らかに描くために GPU で描く。依頼が「ページ全体」なので index.html もコードに数え、計測用コードは bench.js に分けた
+  alternatives:
+    - option: Canvas 2D
+      rejected_because: 比べていない
+    - option: GPU の ID 描画による当たり判定 (02 の方式)
+      rejected_because: 総当たりで p95 0.3 ms なので要らない
+  not_doing: [地図上の文字, 国境, タイル, 回転, 3D, 実行時の投影計算, タッチ操作, クリックでの選択, 検索]
+
+verification:
+  checks:
+    - id: every-centre-drawn
+      what: 世界全体の表示で、全都市の中心のピクセルに何かが描かれている
+      how: 全ピクセルを読み戻し、各都市の中心が陸の色でも海の色でもないことを見る (密集地では隣の点の白い縁がかかるので「橙」ではなく「陸でも海でもない」)
+      expected: 7,342 of 7,342
+    - id: greenland-is-land
+      what: グリーンランド (40°W, 75°N) が陸の色
+      how: 同じ読み戻しでそのピクセルを見る
+      expected: 222,219,209 (±3)
+    - id: pacific-is-sea
+      what: 太平洋 (140°W, 5°S) が海の色
+      how: 同上
+      expected: 204,224,237 (±3)
+    - id: tokyo-highlighted
+      what: 東京の上に本物の pointermove を送ると、その点が強調色で描かれる
+      how: 東京を中心に 8 倍で表示し、画面中央へ pointermove を送って描き、中央のピクセルを読む
+      expected: 青 (B > 150 かつ R < 60)
+    - id: tokyo-tooltip
+      what: 同じとき、ツールチップに東京の名前と人口が出る
+      how: ツールチップの文字列を見る
+      expected: 東京都 (日本) 人口 35,676,000 人
+    - id: pacific-no-tooltip
+      what: 太平洋の上ではツールチップが空
+      how: 世界全体の表示で太平洋の位置へ pointermove を送る
+      expected: 空文字列
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画ならエラーにする

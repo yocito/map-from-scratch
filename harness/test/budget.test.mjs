@@ -32,3 +32,17 @@ test('stat defaults to p50', () => {
   assert.equal(r.stat, 'p50');
   assert.equal(r.pass, true);
 });
+
+test('checkVerification: every defined check reported in every iteration and passing', async () => {
+  const { checkVerification } = await import('../lib/budget.mjs');
+  const ok = { a: [{ pass: true }, { pass: true }] };
+  assert.deepEqual(checkVerification(['a'], ok, 2), [{ id: 'a', pass: true, reported: 2, failed: 0, detail: undefined }]);
+  const [missing] = checkVerification(['b'], ok, 2);
+  assert.equal(missing.pass, false);
+  assert.match(missing.reason, /not reported/);
+  const [short] = checkVerification(['a'], { a: [{ pass: true }] }, 2);
+  assert.equal(short.pass, false);
+  const [failed] = checkVerification(['a'], { a: [{ pass: true }, { pass: false, detail: 'IDN' }] }, 2);
+  assert.equal(failed.pass, false);
+  assert.equal(failed.detail, 'IDN');
+});

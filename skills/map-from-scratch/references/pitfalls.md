@@ -60,3 +60,17 @@ plausible numbers. Suspect the measurement before the renderer.
   slower, not safer (01); incremental repaint was not needed (01); a GPU-time
   difference between vertex layouts disappeared (02). Re-run what was
   measured under the broken setting and correct REQUEST.md.
+
+## Found by an agent working from this skill alone (example 07)
+
+- **The first locale call is slow.** The first `toLocaleString('ja-JP')`
+  initialises ICU: 34 ms once, 0.17 ms after. It showed up as one outlier in
+  every hover run. Format numbers with a regular expression where a
+  response must be immediate.
+- **A tight colour check fails in dense areas.** "The city centre is orange"
+  failed for 536 of 7,342 cities because a neighbour's white outline covered
+  the centre; the drawing was right. Test for "not land and not sea" and
+  record the strict ratio as information.
+- **Load moves time budgets, not GPU time.** With a load average of 124 the
+  first frame p50 was 174 ms, at 72 it was 76 ms; gpu_ms stayed at 1.2–1.7 ms.
+  Re-measure time budgets on a quiet machine before concluding.

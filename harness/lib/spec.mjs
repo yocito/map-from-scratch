@@ -1,12 +1,80 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
+import { parseYaml } from './yaml.mjs';
 
 const RUNTIMES = ['browser', 'native'];
 const STATS = ['min', 'p50', 'p95', 'p99', 'max', 'mean'];
 
+// spec.yaml is the definition of an example: requirements, evaluation,
+// benchmarks, datasets, performance knowledge, architecture selection and
+// verification. The harness takes its run settings from it. spec.json (run
+// settings only) is still read for examples that have not moved over.
 export function loadSpec(dir) {
+  const yaml = join(dir, 'spec.yaml');
+  if (existsSync(yaml)) {
+    const def = parseYaml(readFileSync(yaml, 'utf8'));
+    validateDefinition(def, basename(dir));
+    return { ...validateSpec(fromDefinition(def), basename(dir)), definition: def };
+  }
   const spec = JSON.parse(readFileSync(join(dir, 'spec.json'), 'utf8'));
   return validateSpec(spec, basename(dir));
+}
+
+export const SECTIONS = ['requirements', 'evaluation', 'benchmarks', 'datasets', 'performance_knowledge', 'architecture_selection', 'verification'];
+
+export function validateDefinition(def, dirName) {
+  const fail = (msg) => { throw new Error(`${dirName}/spec.yaml: ${msg}`); };
+  for (const k of SECTIONS) if (def[k] === undefined || def[k] === null) fail(`section ${k} is required`);
+  if (!Array.isArray(def.requirements)) fail('requirements must be a list');
+  if (!Array.isArray(def.evaluation.budgets)) fail('evaluation.budgets must be a list');
+  if (!Array.isArray(def.performance_knowledge)) fail('performance_knowledge must be a list');
+  if (!Array.isArray(def.verification.checks)) fail('verification.checks must be a list');
+  if (!def.architecture_selection.chosen) fail('architecture_selection.chosen is required');
+  const reqIds = new Set(def.requirements.map((r) => r.id));
+  for (const r of def.requirements) if (!r.id || !r.need) fail('every requirement needs id and need');
+  for (const b of def.evaluation.budgets) {
+    if (!b.metric) fail('every budget needs a metric');
+    if (!reqIds.has(b.requirement)) fail(`budget ${b.metric} points at unknown requirement "${b.requirement}"`);
+  }
+  for (const r of def.requirements) {
+    const measured = def.evaluation.budgets.some((b) => b.requirement === r.id);
+    if (!measured && !r.unmeasured) fail(`requirement ${r.id} has no budget and no "unmeasured" reason`);
+  }
+  for (const c of def.verification.checks) {
+    if (!c.id || !c.what || !c.how || c.expected === undefined) fail(`check ${c.id ?? '?'} needs id, what, how and expected`);
+  }
+  return def;
+}
+
+export function fromDefinition(def) {
+  const b = def.benchmarks, chosen = def.architecture_selection.chosen;
+  const run = b.runtime === 'browser'
+    ? {
+      page: b.page,
+      viewport: b.viewport && {
+        width: b.viewport.width, height: b.viewport.height,
+        deviceScaleFactor: b.viewport.device_scale_factor ?? 1, mobile: b.viewport.mobile ?? false,
+      },
+      cpuThrottle: b.cpu_throttle ?? 1,
+    }
+    : { cmd: b.cmd };
+  if (run.viewport === undefined) delete run.viewport;
+  return {
+    id: def.id,
+    request: def.request,
+    baseline: def.baseline ?? false,
+    runtime: b.runtime,
+    gpu: chosen.gpu,
+    bake: def.datasets.bake,
+    build: chosen.build ?? undefined,
+    run,
+    iterations: b.iterations,
+    timeoutMs: b.timeout_ms,
+    footprint: { code: chosen.code ?? [], data: def.datasets.outputs ?? [], elf: chosen.elf },
+    dependencies: chosen.dependencies ?? [],
+    budgets: Object.fromEntries(def.evaluation.budgets.map((x) => [x.metric, { stat: x.stat, max: x.max, min: x.min }])),
+    checks: def.verification.checks.filter((c) => (c.by ?? 'bench') === 'bench').map((c) => c.id),
+  };
 }
 
 export function validateSpec(spec, dirName) {
@@ -29,13 +97,14 @@ export function validateSpec(spec, dirName) {
   spec.footprint.code ??= [];
   spec.footprint.data ??= [];
   spec.dependencies ??= [];
+  spec.checks ??= [];
   spec.gpu ??= 'hardware';
   if (!['hardware', 'none'].includes(spec.gpu)) fail('gpu must be "hardware" or "none"');
   spec.iterations ??= 5;
   spec.timeoutMs ??= 120000;
   spec.budgets ??= {};
   for (const [name, b] of Object.entries(spec.budgets)) {
-    if (b.max === undefined && b.min === undefined) fail(`budget ${name} needs max or min`);
+    if (b.max == null && b.min == null) fail(`budget ${name} needs max or min`);
     if (b.stat !== undefined && !STATS.includes(b.stat)) fail(`budget ${name}: stat must be one of ${STATS.join(', ')}`);
   }
   return spec;

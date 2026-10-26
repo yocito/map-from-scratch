@@ -1,0 +1,78 @@
+id: b02-maplibre
+baseline: true
+request: >-
+  （比較用）02 と同じ依頼「スマホで、世界の国を人口で塗り分けた地図をピンチで拡大して、タップした国の名前と人口を出したい」を、
+  汎用地図エンジン MapLibre GL JS 5.24.0 で作ったもの。
+
+requirements:
+  - id: compare-with-02
+    need: 02 と同じ条件で汎用エンジンを測り、02 の数値と並べる
+    unmeasured: 比較用なので予算はない。数値は README の比較表に載せる
+
+evaluation:
+  budgets: []
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: baselines/b02-maplibre/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 3, mobile: true}
+  cpu_throttle: 4
+  iterations: 5
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、MapLibre が最初に idle になる (タイルを作って描き終える) まで
+      metrics: [first_frame_ms]
+    - id: pinch-path-cold
+      what: 02 と同じ経路 (日本へ 32 倍まで、5 ズームレベル) の 1 回目。新しいズームのタイルをワーカーが作っている間も描く
+      metrics: [cold_cpu_ms, cold_frame_ms, cold_gpu_ms]
+    - id: pinch-path
+      what: 同じ経路の 2 回目。経路上のタイルは作り終えていて、描くだけ
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+    - id: settle
+      what: 世界全体から新しいズームへ飛んで idle になるまで (5 回)
+      metrics: [settle_ms]
+    - id: taps
+      what: 世界全体の表示で queryRenderedFeatures を擬似乱数の 200 点で
+      metrics: [pick_ms]
+
+datasets:
+  bake: [sh, -c, node baselines/b02-maplibre/bake.mjs && mkdir -p .cache/baselines && cd .cache/baselines && npm install --no-audit --no-fund --silent maplibre-gl@5.24.0]
+  sources:
+    - id: ne-countries
+      origin: Natural Earth 10m Admin 0 countries v5.1.1
+      license: Public domain
+  outputs: [data/baked/b02-maplibre/countries.geojson]
+  preparation:
+    - 02 と同じく Equal Earth で同じ許容誤差で単純化し、残った点を元の経緯度で GeoJSON に書く (同じジオメトリで比べるため)
+
+performance_knowledge:
+  - id: general-engine-costs
+    finding: 汎用エンジンは、同じ依頼でも配るコード、初回描画、1 フレームの JS 時間、メモリで大きく上回る
+    evidence: code gzip 286 KB (02 は 3.4 KB)、first_frame p50 1,144 ms (227 ms)、cpu_ms p50 1.9 ms (0.005 ms)、JS ヒープ 37 MB (1.1 MB)
+    applies_when: 専用の描画器を作る価値を数字で示すとき
+  - id: worker-fetch-not-in-transfer
+    finding: MapLibre は GeoJSON をワーカーの中で取得するので、ハーネスの transfer_kb に入らない
+    evidence: transfer_kb 1,108 KB は本体の JS だけで、GeoJSON 3.2 MB を含まない
+    applies_when: ワーカーで通信する描画器の転送量を比べるとき。footprint の data_bytes で比べる
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: MapLibre GL JS 5.24.0 (WebGL2)
+    language: JavaScript
+    gpu: hardware
+    code: [.cache/baselines/node_modules/maplibre-gl/dist/maplibre-gl.js, .cache/baselines/node_modules/maplibre-gl/dist/maplibre-gl.css]
+    dependencies: [maplibre-gl]
+    why: 比較の基準として、地図アプリで最もよく使われるオープンソースの汎用エンジンを選んだ
+  alternatives: []
+  not_doing: [背景地図, 文字, 地球儀]
+
+verification:
+  checks:
+    - id: pick-tokyo
+      what: 東京 (139.7°E, 35.7°N) で queryRenderedFeatures が日本を返す
+      how: map.project で画面上の位置を求めて問い合わせる
+      expected: JPN
+  harness:
+    - info.gpu がソフトウェア描画ならエラーにする

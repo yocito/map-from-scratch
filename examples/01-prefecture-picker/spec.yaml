@@ -1,0 +1,107 @@
+id: 01-prefecture-picker
+request: >-
+  自治体の観光サイトの記事に、都道府県を選ぶ日本地図を埋め込みたい。クリックやタップで選んだ都道府県で記事を絞り込む。
+  外部ライブラリは入れられないし、ページが重くなるのは困る。
+
+# 依頼から読み取った要件。数値にできるものは evaluation.budgets が指す。
+requirements:
+  - id: light-page
+    need: ページが重くならない
+    rationale: 記事に埋め込む部品なので、配るコードとデータが記事より目立って重くてはいけない
+  - id: phone
+    need: スマホでも使える
+    rationale: 観光サイトの読者の多くはスマホで読む
+    unmeasured: 端末そのものではなく、benchmarks の画面とスロットルで代わりに測る
+  - id: quick-start
+    need: 開いてすぐ地図が出る
+  - id: responsive
+    need: ホバーとタップに即応する
+  - id: tells-the-page
+    need: 選んだ県を記事の側へ渡す
+    unmeasured: 時間ではなく正しさの要件なので verification.checks の click-tokyo で確かめる
+
+# 合否の決め方。予算はすべて満たし、verification の check はすべての反復で通ること。
+evaluation:
+  budgets:
+    - {metric: code_gzip_bytes, max: 1500, unit: B, requirement: light-page}
+    - {metric: data_bytes, max: 16000, unit: B, requirement: light-page}
+    - {metric: first_frame_ms, stat: p50, max: 300, unit: ms, requirement: quick-start}
+    - {metric: redraw_ms, stat: p95, max: 2, unit: ms, requirement: responsive}
+    - {metric: frame_interval_ms, stat: p95, max: 20, unit: ms, requirement: responsive}
+    - {metric: pick_ms, stat: p95, max: 1, unit: ms, requirement: responsive}
+  gates: [エラーがない, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/01-prefecture-picker/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 3, mobile: true}
+  cpu_throttle: 4
+  iterations: 10
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、地図を描いた 2 回目の rAF まで
+      metrics: [first_frame_ms]
+    - id: idle-baseline
+      what: 何も描かないページの rAF 間隔 120 回。この環境のフレームの刻みの基準
+      metrics: [idle_frame_interval_ms]
+    - id: hover
+      what: ホバーを 47 県に順に移しながら毎フレーム全体を描き直す 240 フレーム
+      metrics: [redraw_ms, frame_interval_ms]
+    - id: pick
+      what: 地図上の決まった擬似乱数の 2,000 点で当たり判定
+      metrics: [pick_ms]
+
+datasets:
+  bake: [node, examples/01-prefecture-picker/bake.mjs]
+  sources:
+    - id: ne-japan-prefectures
+      origin: Natural Earth 10m Admin 1 (states and provinces) v5.1.1、日本の 47 件
+      license: Public domain
+  outputs: [data/baked/01-prefecture-picker/prefectures.json]
+  preparation:
+    - 緯度 36° の cos を掛けた正距円筒で投影し、主な島が収まる外接矩形を 1,000 単位のグリッドにする
+    - Douglas–Peucker で 1.2 単位に単純化し、面積 12 平方単位未満の島を除く
+    - 1 県 1 本の SVG パス文字列 (最初の点だけ絶対座標、あとは相対の整数) にする
+
+performance_knowledge:
+  - id: canvas-records-not-draws
+    finding: Canvas 2D の描画呼び出しは記録だけで、ラスタ化は合成のときに起きる。描画ごとに getImageData で同期すると、描画ではなく読み戻しを測ってしまう
+    evidence: getImageData で同期した再描画は p50 14 ms、そのうち描画呼び出しは 0.02 ms
+    applies_when: Canvas 2D の 1 フレームの費用を測るとき。rAF のフレーム間隔で測る
+  - id: full-redraw-is-enough
+    finding: 47 県なら、変わった県だけを塗り直さなくても、毎回全体を描き直して足りる
+    evidence: 4 倍スロットル下のホバー中のフレーム間隔 p95 は、全面描き直し 1.5 ms、部分の塗り直し 1.3 ms
+    applies_when: 形が数十個までの地図
+  - id: gpu-canvas-is-faster
+    finding: GPU で描く 2D canvas は、CPU で描く canvas (willReadFrequently) より速い
+    evidence: ホバー中のフレーム間隔 p50 は GPU 0.7 ms、CPU 14.8 ms。初回描画は 92 ms と 134 ms
+    applies_when: Chromium、GPU あり
+  - id: no-index-needed
+    finding: 47 本のパスなら、isPointInPath を順に試すだけで当たり判定は足りる
+    evidence: pick_ms p95 0.01 ms
+    applies_when: 当たり判定の対象が数十個まで
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D (Path2D と isPointInPath)
+    language: JavaScript (ES modules、ビルドなし)
+    gpu: none
+    code: [examples/01-prefecture-picker/picker.js]
+    dependencies: []
+    why: 47 個の固定の形を描いて当てるだけなので、パースも当たり判定もブラウザ内蔵の Path2D に任せられる
+  alternatives:
+    - option: WebGL2
+      rejected_because: 三角形分割、シェーダ、ID 描画が要り、コードが何倍にもなる。47 個の形では描画性能が要らない
+    - option: SVG の DOM (47 個の path 要素)
+      rejected_because: 比べていない。同じくらい小さく作れる可能性はある
+  not_doing: [パン, ズーム, 回転, 3D, タイル, 地図上の文字, 実行時の投影, WebGL, データ形式のパーサ]
+
+verification:
+  checks:
+    - id: click-tokyo
+      what: 東京の内側をクリックすると、地図の要素に prefecture イベントで JP-13 が届く
+      how: 2 px 刻みで pick を走らせて東京の内側の点を探し、その点で click イベントを送る
+      expected: JP-13
+  harness:
+    - canvas の contextlost が起きたらエラーにする

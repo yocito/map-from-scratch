@@ -1,0 +1,112 @@
+id: 04-osm-node-density
+request: >-
+  東京23区の OSM の全ノード（約 966 万点）の密度をヒートマップで見たい。拡大・移動したら、タイルの粗い集計ではなく、
+  その画面の解像度で数え直してほしい。PC のブラウザで。
+
+requirements:
+  - id: recount-per-view
+    need: その画面の解像度で数え直す
+    unmeasured: 正しさの要件なので verification.checks の count-conservation で確かめる
+  - id: smooth-navigation
+    need: 拡大・移動が滑らか
+    rationale: 120 Hz の 1 フレーム 8.3 ms。全体表示 (最悪の場合) も同じ基準にする
+  - id: visible
+    need: 密度が画面に出ている
+    unmeasured: verification.checks の shibuya-not-empty と ramp-reaches-bright で確かめる
+  - id: opens
+    need: PC のブラウザで開ける
+    rationale: 966 万点を生のまま配るのは依頼の前提。ローカル配信で 2 秒以内に最初の絵
+
+evaluation:
+  budgets:
+    - {metric: frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-navigation}
+    - {metric: whole_frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-navigation}
+    - {metric: first_frame_ms, stat: p50, max: 2000, unit: ms, requirement: opens}
+    - {metric: data_gzip_bytes, max: 20000000, unit: B, requirement: opens}
+    - {metric: code_gzip_bytes, max: 4000, unit: B, requirement: opens}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/04-osm-node-density/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  cpu_throttle: 1
+  iterations: 3
+  scenarios:
+    - id: first-frame
+      what: ページの読み込み (38 MB の取得と差分の復元を含む) から、最初の描画の GPU 完了まで
+      metrics: [first_frame_ms]
+    - id: zoom-path
+      what: 23 区全体から渋谷駅周辺へ 256 倍までズームして戻る 300 フレーム
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+    - id: whole-view
+      what: 全体表示で止めた 60 フレーム。全点がピクセルに描かれ、ブレンドが最も競合する
+      metrics: [whole_cpu_ms, whole_frame_ms, whole_gpu_ms]
+    - id: street-view
+      what: 256 倍で止めた 60 フレーム。ほぼ全点がクリップされる
+      metrics: [street_cpu_ms, street_frame_ms, street_gpu_ms]
+
+datasets:
+  bake: [node, examples/04-osm-node-density/bake.mjs]
+  sources:
+    - id: osm-tokyo23
+      origin: OpenStreetMap、東京 23 区の抽出、2026-08-31 時点 (9,659,934 ノード)
+      license: ODbL (© OpenStreetMap contributors)
+  outputs: [data/baked/04-osm-node-density/nodes.bin]
+  preparation:
+    - osmium で全ノードの位置だけを取り出す
+    - 23 区の枠 (139.55–139.93°E、35.50–35.83°N) の外の 1,872 点を除く (海や島へ延びるリレーションの構成ノード)
+    - 経度に cos(緯度) を掛けた正方グリッドで 16 ビットに量子化する (約 0.5 m)
+    - Morton 符号で並べ替え、前の点との差分 (2^16 で折り返す) で x と y を別々に保存する
+
+performance_knowledge:
+  - id: stride-interleave
+    finding: Morton 順の点をそのまま描くと、同じピクセルへの加算ブレンドが連続して詰まる。128 本のストライドに分けて並べ直すと解消する
+    evidence: 全体表示の gpu_ms は、ストライド 1 で 11.7 ms、16 で 5.4、64 で 2.7、128 で 2.6、256 で 3.3、4096 で 7.6 ms (RTX 3060)
+    applies_when: 空間順に並べた大量の点を加算ブレンドするとき。最適値は GPU によって違うので測り直す
+  - id: two-cost-regimes
+    finding: 全体表示はブレンドの競合、街区表示は頂点処理がコストの大半で、性質が違う。経路の p95 だけでは全体表示の最悪値が隠れる
+    evidence: 経路の frame_ms p95 5.2 ms のとき、全体表示は 11.7 ms だった。1 ピクセル最大 803 点
+    applies_when: 表示範囲で描くものの量が大きく変わる描画器
+  - id: incomplete-float-texture
+    finding: R32F のテクスチャはフィルタを NEAREST にしないと不完全になり、texelFetch がすべて 0 を返す
+    evidence: 数の合計の検査は通ったのに、画面は真っ黒だった
+    applies_when: 浮動小数点のテクスチャを読むシェーダ
+  - id: gpu-only-exposure
+    finding: 最大値を 4×4 ずつ 1×1 まで縮約し、色付けのパスがその 1 テクセルを読めば、CPU に読み戻さずに色の尺度を画面に合わせられる
+    evidence: 縮約を含めても全体表示の gpu_ms 2.6 ms
+    applies_when: 表示ごとに正規化が要るヒートマップ
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2 (EXT_color_buffer_float と EXT_float_blend)
+    language: JavaScript (ES modules、ビルドなし)
+    gpu: hardware
+    code: [examples/04-osm-node-density/density.js]
+    dependencies: []
+    why: 966 万点を毎フレーム数え直すには、GPU の加算ブレンドで数えるのが最も短い。浮動小数点の加算ブレンドは WebGL2 の拡張で使える
+  alternatives:
+    - option: WebGPU (compute でビンに atomicAdd)
+      rejected_because: このハーネスでは headless Chromium の WebGPU が SwiftShader になり、GPU で測れない
+    - option: 事前集計のピラミッド (タイル)
+      rejected_because: 依頼が「タイルの粗い集計ではなく、その画面の解像度で」と明言している
+  not_doing: [タイル, 事前集計, タグや種類での絞り込み, 地名, 背景地図, 点のクリック]
+
+verification:
+  checks:
+    - id: count-conservation
+      what: 全体が見えているとき、ピクセルごとの数の合計が点の数に一致する
+      how: 0.9 倍の表示で数え、カウント用の R32F フレームバッファを全部 FLOAT で読み戻して合計する
+      expected: 9,658,062
+    - id: shibuya-not-empty
+      what: 画面に出た色で、渋谷駅の位置が「点なし」の色でない
+      how: 渋谷駅を中心に 6 倍で描き、画面中央のピクセルを読み戻す
+      expected: 背景色 (8,8,15) 以外
+    - id: ramp-reaches-bright
+      what: 色の段階のいちばん明るい色まで画面に出ている
+      how: 同じ画面の全ピクセルの G の最大値を見る
+      expected: G ≥ 200
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画ならエラーにする

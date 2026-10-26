@@ -1,0 +1,97 @@
+id: 03-quake-timeline
+request: >-
+  2025年に世界で起きた M4.5 以上の地震を、地図の上で時間を追って再生したい。再生・一時停止と、スライダーで好きな日時に飛べるように。PC のブラウザで見る。
+
+requirements:
+  - id: smooth-playback
+    need: 再生が滑らか (PC のモニタ、高リフレッシュレートも)
+    rationale: 120 Hz の 1 フレーム 8.3 ms に GPU の処理まで収まること
+  - id: jump-anywhere
+    need: スライダーでどの日時へもすぐ飛べる
+    rationale: 時刻を変えるたびに CPU でデータを選び直すと、飛ぶ先によって遅さが変わる
+  - id: when-and-where
+    need: いつどこで起きたかが分かる
+    unmeasured: 正しさの要件なので verification.checks で確かめる
+  - id: quick-start
+    need: 開いてすぐ見られる
+
+evaluation:
+  budgets:
+    - {metric: frame_ms, stat: p95, max: 8.3, unit: ms, requirement: smooth-playback}
+    - {metric: cpu_ms, stat: p95, max: 0.5, unit: ms, requirement: jump-anywhere}
+    - {metric: first_frame_ms, stat: p50, max: 500, unit: ms, requirement: quick-start}
+    - {metric: code_gzip_bytes, max: 4000, unit: B, requirement: quick-start}
+    - {metric: data_gzip_bytes, max: 600000, unit: B, requirement: quick-start}
+  gates: [エラーがない, ハードウェアの GPU で描いている, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/03-quake-timeline/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  cpu_throttle: 1
+  iterations: 5
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、最初の描画を readPixels で GPU 完了まで待った時刻まで
+      metrics: [first_frame_ms]
+    - id: play-and-zoom
+      what: 1 年を 600 フレームで再生しながら、日本へ 8 倍までズームして戻る。毎フレーム時刻が変わる
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+
+datasets:
+  bake: [node, examples/03-quake-timeline/bake.mjs]
+  sources:
+    - id: usgs-quakes-2025
+      origin: USGS ComCat、2025 年、M4.5 以上、earthquake のみ (8,502 件)
+      license: Public domain (米国政府の著作物)
+    - id: ne-countries
+      origin: Natural Earth 10m Admin 0 countries v5.1.1 (陸の塗りだけに使う)
+      license: Public domain
+  outputs:
+    - data/baked/03-quake-timeline/land.bin
+    - data/baked/03-quake-timeline/quakes.bin
+    - data/baked/03-quake-timeline/quakes.json
+  preparation:
+    - 陸は Equal Earth で投影し、8 倍ズームの 1.5 px で単純化して三角形分割する (国境は持たない)
+    - 地震は時刻順に並べ、1 件 12 バイト (位置 u16×2、年初からの分 f32、マグニチュード×10−40 と深さ/3 km の u8×2) にする
+    - 説明の 1 行に使う発生時刻・マグニチュード・地名を JSON に分ける
+
+performance_knowledge:
+  - id: uniform-only-frames
+    finding: 全件を最初に GPU へ送り、フレームごとには時刻の uniform 1 つだけを変えると、どの時刻へ飛んでも CPU の費用は同じで、ほぼゼロになる
+    evidence: cpu_ms p95 0.015〜0.02 ms、gpu_ms p50 0.03 ms
+    applies_when: 件数が数万までの時系列の点
+  - id: two-draw-calls
+    finding: 1 フレームは陸の塗りと点の 2 ドローコールで済む。見えない点は頂点シェーダで gl_PointSize 0 にして捨てる
+    evidence: frame_ms p95 0.3〜1.1 ms
+    applies_when: 表示の切り替えが時刻だけで決まるとき
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2
+    language: JavaScript (ES modules、ビルドなし)
+    gpu: hardware
+    code: [examples/03-quake-timeline/quake.js]
+    dependencies: []
+    why: 時刻ごとの見え方 (波紋、薄れ方) を頂点シェーダで計算すれば、CPU は何もしなくてよい
+  alternatives:
+    - option: Canvas 2D
+      rejected_because: 比べていない。毎フレーム見える地震を CPU で選んで描くことになり、飛ぶ先によって費用が変わる
+    - option: 地球儀 (3D)
+      rejected_because: 依頼は「地図の上で」で、平面で足りる。3D の処理が丸ごと要らない
+  not_doing: [3D, 地球儀, 国境, 地名, タイル, 震源の深さの立体表示, イベントのクリック]
+
+verification:
+  checks:
+    - id: myanmar-before
+      what: ミャンマー M7.7 (2025-03-28 06:20 UTC) の震央は、その 1 日前には陸の色
+      how: 世界全体の表示で時刻を発生の 1 日前にして描き、震央のピクセルを読み戻す
+      expected: 赤より灰に近い色 (R < 230 かつ |R − G| < 20)
+    - id: myanmar-after
+      what: 同じ震央が、発生の 30 分後には浅い地震の赤
+      how: 時刻を発生の 30 分後にして描き、同じピクセルを読み戻す
+      expected: 赤 (R > 150 かつ G < 120)
+  harness:
+    - webglcontextlost が起きたらエラーにする
+    - info.gpu がソフトウェア描画ならエラーにする

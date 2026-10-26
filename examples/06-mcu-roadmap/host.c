@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     render(&v, &st);
     uint16_t c = frame[(MM_H / 2) * MM_W + MM_W / 2];
     printf("@mfs {\"info\":{\"motorway_rgb565\":\"0x%04X\"}}\n", c);
-    if (c != 0xE30B) printf("@mfs {\"error\":\"motorway point not drawn red (0x%04X)\"}\n", c);
+    printf("@mfs {\"check\":\"motorway-point-red\",\"pass\":%s,\"detail\":\"0x%04X\"}\n", c == 0xE30B ? "true" : "false", c);
     break;
   }
 

@@ -57,14 +57,14 @@ if (new URLSearchParams(location.search).has('bench')) {
   emit({ metric: 'pick_ms', values: tap });
 
   // Functional checks: what is under these places must be these countries.
-  const where = [[139.7, 35.7, 'JPN'], [2.35, 48.86, 'FRA'], [-47.9, -15.8, 'BRA'], [-150, 0, null]];
-  for (const [lon, lat, want] of where) {
+  const where = [['pick-tokyo', 139.7, 35.7, 'JPN'], ['pick-paris', 2.35, 48.86, 'FRA'], ['pick-brasilia', -47.9, -15.8, 'BRA'], ['pick-pacific', -150, 0, null]];
+  for (const [check, lon, lat, want] of where) {
     const [x, y] = world(lon, lat);
     const sx = (x - cam.x) * cam.zoom * gl.canvas.width + gl.canvas.width / 2;
     const sy = (y - cam.y) * cam.zoom * gl.canvas.width * (1.3174 / 2.7066) + gl.canvas.height / 2;
     const id = map.pick(sx, sy);
     const got = id < 0 ? null : map.countries[id][0];
-    if (got !== want) emit({ error: `pick at ${lon},${lat}: got ${got}, want ${want}` });
+    emit({ check, pass: got === want, detail: String(got) });
   }
   // Leave Japan selected and in view for the screenshot.
   cam.x = jx; cam.y = jy; cam.zoom = 6;
