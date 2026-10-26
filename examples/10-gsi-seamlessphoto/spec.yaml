@@ -1,7 +1,7 @@
 id: 10-gsi-seamlessphoto
 request: >-
   z.yuiseki.net に置いた国土地理院の全国最新写真（シームレス）を、ブラウザで移動・拡大しながら見たい。
-  約715GBの PMTiles 全体はダウンロードせず、画面に必要な写真だけを読む。
+  約715 GiB（約768 GB）の PMTiles 全体はダウンロードせず、画面に必要な写真だけを読む。
 requirements:
   - id: browse-photo
     need: 写真をドラッグとホイールで移動・拡大できる

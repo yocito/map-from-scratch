@@ -1,6 +1,6 @@
 # 全国最新写真（シームレス）を Range で見る
 
-「[z.yuiseki.net のシームレス空中写真](https://z.yuiseki.net/static/gsi/seamlessphoto/)を使う例」という依頼です。約715GB の `seamlessphoto512.pmtiles` をブラウザから HTTP Range で読み、東京駅・富士山・大阪城を起点に移動、拡大できます。写真データは GitHub Pages にコピーしません。
+「[z.yuiseki.net のシームレス空中写真](https://z.yuiseki.net/static/gsi/seamlessphoto/)を使う例」という依頼です。約715 GiB（約768 GB）の `seamlessphoto512.pmtiles` をブラウザから HTTP Range で読み、東京駅・富士山・大阪城を起点に移動、拡大できます。写真データは GitHub Pages にコピーしません。
 
 アーカイブは PMTiles v3、512px JPEG、ズーム 1～17 です。最初の 16 KiB からヘッダーとルート索引を読み、必要な葉索引と写真タイルだけを取得します。Range 要求が HTTP 206 以外を返した場合はエラーにします。表示中の写真は最大 96 枚を保持します。
 
