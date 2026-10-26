@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDefinition, fromDefinition } from '../lib/spec.ts';
+import { validateDefinition, fromDefinition, publishOnPages } from '../lib/spec.ts';
 
 // Loose on purpose: the tests break definitions to see them refused.
 const def = (): any => ({
@@ -42,6 +42,15 @@ const def = (): any => ({
 
 test('a complete definition is valid', () => {
   assert.doesNotThrow(() => validateDefinition(def(), '01-x'));
+});
+
+test('Pages publication defaults to enabled and can be explicitly disabled with a reason', () => {
+  const d = def();
+  assert.equal(publishOnPages(validateDefinition(d, '01-x')), true);
+  d.publication = { pages: false, reason: 'Source data redistribution has not been cleared' };
+  assert.equal(publishOnPages(validateDefinition(d, '01-x')), false);
+  delete d.publication.reason;
+  assert.throws(() => validateDefinition(d, '01-x'), /publication.reason/);
 });
 
 test('every one of the seven sections is required', () => {

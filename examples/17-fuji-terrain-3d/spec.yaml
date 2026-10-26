@@ -1,6 +1,10 @@
 id: 17-fuji-terrain-3d
 request: >-
   富士山のまわりの地形を、3D で斜めから眺めたい。PC のブラウザで、なめらかに回したい。
+publication:
+  pages: false
+  reason: >-
+    日本の元データを加工した fuji.terr の再配布条件を確認できていないため。
 
 requirements:
   - id: see-fuji-3d
@@ -141,8 +145,7 @@ datasets:
         国土交通省国土地理院の基盤地図情報 (数値標高モデル、jpdem1a/5a/5b/5c/10a/10b) で、条件は「国土地理院コンテンツ利用規約／
         測量法に基づく国土地理院長承認（使用）R 8JHs 131」。承認は Mapterhorn の使用についてのもので、この焼き直しを再配布してよいか
         (出典の表示だけで足りるか、測量成果の複製・使用の承認が要るか) は人が判断する。判断が出るまで Pages には公開しない。
-        ハーネスには例ごとに公開を止める仕組みがなく、tools/deploy-pages.sh は outputs をすべて .cache/site に写すので、公開の可否は
-        deploy-pages.sh を走らせる人に頼っている (今は 17 の bench --site が失敗するので、--no-check を付けない限り push まで進まない)
+        publication.pages: false により、Pages の生成時はページ・コード・データを除外する。
   outputs: [data/baked/17-fuji-terrain-3d/fuji.terr]
   preparation:
     - 区画は z12 のタイル 6x6 (x 3624-3629、y 1614-1619)。138.5156-139.0430E、35.1738-35.6037N、3072x3072 標本、47.86 km 四方

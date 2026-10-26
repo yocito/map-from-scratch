@@ -23,8 +23,11 @@
 | [05-tokyo-roads-native](examples/05-tokyo-roads-native/REQUEST.md) | ブラウザなしのデスクトップアプリで 23 区の全道路を 144 Hz で | C + EGL + OpenGL ES 3.0 |
 | [06-mcu-roadmap](examples/06-mcu-roadmap/REQUEST.md) | ESP32-C6 と 240×240 液晶で渋谷駅周辺の道路地図 (FPU なし) | C (freestanding、RISC-V) |
 | [07-world-cities-hover](examples/07-world-cities-hover/REQUEST.md) | 世界の都市 7,342 を人口の大きさの点で、マウスを乗せると名前と人口。ページ全体で gzip 150 KB 以内 | WebGL2 |
+| [16-plateau-buildings-3d](examples/16-plateau-buildings-3d/spec.yaml) | 東京駅周辺の PLATEAU 建物を 3D で回して見る | WebGL2 |
+| [17-fuji-terrain-3d](examples/17-fuji-terrain-3d/REQUEST.md) | 富士山周辺の地形を 3D で回して見る（元データの再配布条件を確認するまで Pages には掲載しない） | WebGL2 |
 
 各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 
 ## 計測結果
 

@@ -54,6 +54,7 @@ export interface Definition {
   id: string;
   request: string;
   baseline?: boolean;
+  publication?: { pages: boolean; reason?: string };
   requirements: { id: string; need: string; rationale?: string; unmeasured?: string }[];
   evaluation: {
     budgets: { metric: string; stat?: Stat; max?: number; min?: number; unit?: string; requirement: string }[];

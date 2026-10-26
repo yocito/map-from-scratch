@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, copyFileSync, existsSyn
 import { join, dirname, relative, resolve, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripTypeScriptTypes } from 'node:module';
-import { loadSpec } from '../harness/lib/spec.ts';
+import { loadSpec, publishOnPages } from '../harness/lib/spec.ts';
 import { expandFiles } from '../harness/lib/footprint.ts';
 import type { Spec } from '../harness/lib/types.ts';
 
@@ -102,10 +102,13 @@ function indexPage(rows: { id: string; dir: string; spec: Spec }[]): string {
       numbers = `<p class="num">${esc(parts.join(' ・ '))}</p>`;
     }
     const tag = spec.baseline ? '<span class="tag">比較用</span>' : '';
+    const requestLink = existsSync(join(root, dir, 'REQUEST.md'))
+      ? ` ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/REQUEST.md">設計と計測</a>`
+      : '';
     return `<li><a class="open" href="${esc(dir)}/">${esc(id)}</a> ${tag}
   <p class="req">${esc(d.request)}</p>
   <p class="how">${esc([chosen.api, chosen.language].filter(Boolean).join(' / '))}</p>${numbers}
-  <p class="links"><a href="${REPO_URL}/tree/main/${esc(dir)}">ソース</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/spec.yaml">spec.yaml</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/REQUEST.md">設計と計測</a></p></li>`;
+  <p class="links"><a href="${REPO_URL}/tree/main/${esc(dir)}">ソース</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/spec.yaml">spec.yaml</a>${requestLink}</p></li>`;
   }).join('\n');
   return `<!doctype html>
 <html lang="ja">
@@ -143,6 +146,7 @@ for (const base of ['examples', 'baselines']) {
     if (!existsSync(join(dir, 'spec.yaml'))) continue;
     const spec = loadSpec(dir);
     if (spec.runtime !== 'browser') continue;
+    if (!publishOnPages(spec.definition!)) continue;
     copyPage(join(dir, 'index.html'));
     for (const f of expandFiles(root, spec.footprint.code)) if (!f.endsWith('.ts') && !f.endsWith('.html')) copyFile(join(root, f));
     for (const f of expandFiles(root, spec.footprint.data)) copyFile(join(root, f));

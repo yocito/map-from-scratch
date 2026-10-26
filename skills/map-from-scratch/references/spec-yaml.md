@@ -15,6 +15,7 @@ id: 07-world-cities-hover          # = directory name
 request: >-                        # the request, quoted as given
   ...
 baseline: true                     # only under baselines/: dependencies allowed, no budgets needed
+publication: {pages: false, reason: "source data redistribution is pending"} # optional; skips GitHub Pages
 requirements: [...]
 evaluation: {...}
 benchmarks: {...}
@@ -99,6 +100,11 @@ Where the data comes from and what the renderer receives.
 Raw sources live in `tools/sources.ts` (converted once to `data/raw/`,
 again when their settings change). Processing specific to one example
 (dissolving countries, clipping) belongs in its `bake.ts`.
+
+Set `publication.pages: false` with a nonempty `reason` when the example's
+data must not be copied to GitHub Pages. The site builder omits the entire
+example, including its page, code, data and index entry. Omit `publication`
+for examples that may be published.
 
 ## performance_knowledge
 

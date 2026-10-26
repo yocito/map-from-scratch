@@ -17,6 +17,7 @@ docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$ROOT:$ROOT" -w "$ROOT" 
   node --disable-warning=ExperimentalWarning tools/build-site.ts
 if [[ "${1:-}" != --no-check ]]; then
   for id in $(bin/mfs list | grep -E '^[0-9a-z]' ); do
+    [[ -d ".cache/site/examples/$id" || -d ".cache/site/baselines/$id" ]] || continue
     bin/mfs bench "$id" -n 1 --site >/tmp/mfs-site-check.log 2>&1 || { cat /tmp/mfs-site-check.log; echo "site check failed: $id"; exit 1; }
   done
 fi

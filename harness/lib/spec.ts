@@ -25,6 +25,12 @@ export function validateDefinition(input: unknown, dirName: string): Definition 
   const fail = (msg: string): never => { throw new Error(`${dirName}/spec.yaml: ${msg}`); };
   if (!input || typeof input !== 'object' || Array.isArray(input)) fail('not a mapping');
   const def = input as Loose;
+  if (def.publication !== undefined) {
+    if (typeof def.publication?.pages !== 'boolean') fail('publication.pages must be a boolean');
+    if (def.publication.pages === false && (typeof def.publication.reason !== 'string' || !def.publication.reason.trim())) {
+      fail('publication.reason is required when Pages publication is disabled');
+    }
+  }
   for (const k of SECTIONS) if (def[k] === undefined || def[k] === null) fail(`section ${k} is required`);
   if (!Array.isArray(def.requirements)) fail('requirements must be a list');
   if (!Array.isArray(def.evaluation.budgets)) fail('evaluation.budgets must be a list');
@@ -45,6 +51,10 @@ export function validateDefinition(input: unknown, dirName: string): Definition 
     if (!c.id || !c.what || !c.how || c.expected === undefined) fail(`check ${c.id ?? '?'} needs id, what, how and expected`);
   }
   return def as Definition;
+}
+
+export function publishOnPages(def: Definition): boolean {
+  return def.publication?.pages !== false;
 }
 
 export function fromDefinition(def: Definition): Loose {
