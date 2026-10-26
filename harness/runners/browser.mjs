@@ -10,13 +10,13 @@ import { Collector } from '../lib/protocol.mjs';
 // the container runtime. Override with MFS_CHROME_FLAGS when a machine needs
 // something else; the GPU the page actually got is recorded in info.gpu, so a
 // silent fall back to SwiftShader is visible in every result.
+// Do not add the VulkanFromANGLE feature: with it the GPU process crashes
+// right after launch and every context created before that is lost.
 const GPU_FLAGS = [
   '--ignore-gpu-blocklist',
-  '--enable-gpu',
   '--use-angle=vulkan',
-  '--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan',
+  '--enable-features=Vulkan',
   '--enable-unsafe-webgpu',
-  '--disable-vulkan-surface',
   '--disable-gpu-vsync',
   '--disable-frame-rate-limit',
 ];

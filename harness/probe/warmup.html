@@ -1,9 +1,10 @@
 <!doctype html>
 <meta charset="utf-8">
 <script type="module">
-// Headless Chromium drops its first GPU process shortly after launch, taking
-// every context created before that with it. The harness opens this page
-// first and measures nothing until a WebGL context survives one second.
+// A GPU process that crashes shortly after launch (it did with the
+// VulkanFromANGLE feature) takes every context created before that with it.
+// The harness opens this page first and measures nothing until a WebGL
+// context survives one second; info.warmup_attempts > 1 means it happened.
 const emit = (o) => (window.__mfsEmit ? window.__mfsEmit(JSON.stringify(o)) : console.log(o));
 let ok = false;
 for (let attempt = 1; attempt <= 10 && !ok; attempt++) {
