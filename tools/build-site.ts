@@ -101,11 +101,11 @@ function indexPage(rows: { id: string; dir: string; spec: Spec }[]): string {
       if (s('frame_ms', 'p95') != null) parts.push(`フレーム p95 ${s('frame_ms', 'p95').toFixed(2)} ms`);
       numbers = `<p class="num">${esc(parts.join(' ・ '))}</p>`;
     }
-    const tag = spec.baseline ? '<span class="tag">比較用</span>' : '';
+    const tag = spec.baseline ? ' <span class="tag">比較用</span>' : '';
     const requestLink = existsSync(join(root, dir, 'REQUEST.md'))
       ? ` ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/REQUEST.md">設計と計測</a>`
       : '';
-    return `<li><a class="open" href="${esc(dir)}/">${esc(id)}</a> ${tag}
+    return `<li><a class="open" href="${esc(dir)}/">${esc(id)}</a>${tag}
   <p class="req">${esc(d.request)}</p>
   <p class="how">${esc([chosen.api, chosen.language].filter(Boolean).join(' / '))}</p>${numbers}
   <p class="links"><a href="${REPO_URL}/tree/main/${esc(dir)}">ソース</a> ・ <a href="${REPO_URL}/blob/main/${esc(dir)}/spec.yaml">spec.yaml</a>${requestLink}</p></li>`;
