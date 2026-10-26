@@ -1,0 +1,55 @@
+id: 20-ucdp-ged-timeline
+request: UCDP GED の公開データを地図で見たい。出来事が起きた場所を年ごとに追い、暴力の分類と死者数を確認したい。
+requirements:
+  - id: map-events
+    need: UCDP GED 26.1 の出来事を位置で表示する
+    unmeasured: 各年の全レコードを点で描く。表示の目視確認を依頼する。
+  - id: time
+    need: 1989～2025年を切り替えて変化を見る
+    unmeasured: スライダー、年別の棒、再生ボタンで切り替える。操作の目視確認を依頼する。
+  - id: category
+    need: 暴力の分類で表示を絞り、件数と死者数を知る
+    unmeasured: 3分類のチェックボックスと年別の集計を表示する。目視確認を依頼する。
+  - id: details
+    need: 個々の出来事の推計死者数と出典を確認する
+    unmeasured: 点の選択時に日付・国・分類・best 推計・位置精度コード・UCDP ID を表示する。
+  - id: attribution
+    need: ライセンスと指定文献を表示する
+    unmeasured: CC BY 4.0 と UCDP が求める2文献へのリンクをページに表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/20-ucdp-ged-timeline/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: [node, examples/20-ucdp-ged-timeline/bake.ts]
+  sources:
+    - id: ucdp-ged-26.1
+      origin: https://huggingface.co/datasets/yuiseki/ucdp-ged
+      license: CC BY 4.0。UCDP が指定する Davies ほか (2026)、Sundberg & Melander (2013) を引用する。
+    - id: ne-countries
+      origin: Natural Earth 10m Admin 0 v5.1.1
+      license: Public domain
+  outputs: [data/baked/20-ucdp-ged-timeline]
+  preparation:
+    - UCDP GED 26.1 GeoParquet の 417,968 件を、年ごとの小さなバイナリへ変換する
+    - 緯度経度を Web Mercator の16ビット座標へ変換し、年・分類・死者数・位置精度を保持する
+    - Natural Earth の国ポリゴンを簡略化し、背景の陸地として使う
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D と Path2D
+    language: TypeScript
+    gpu: none
+    code: [examples/20-ucdp-ged-timeline/index.html, examples/20-ucdp-ged-timeline/main.ts]
+    dependencies: []
+    why: 一度に表示するのは1年分だけなので、年別ファイルの読込と変更時だけの Canvas 再描画で足りる
+  alternatives:
+    - 全期間の GeoParquet をブラウザで一度に読み込む方式は、最初の表示までが重いため採用しない
+  not_doing: [死亡推計の断定, 国別集計への丸め込み, リアルタイム更新, 一般的な地図エンジン]
+verification:
+  checks: []

@@ -20,6 +20,13 @@ const SOURCES: Record<string, Source> = {
     remote: 'https://huggingface.co/datasets/yuiseki/kontur-population-2023-11-01-22km/resolve/main/parquet/kontur_population_20231101_r4.parquet',
     copy: true,
   },
+  // UCDP Georeferenced Event Dataset 26.1, CC BY 4.0 with publication citations.
+  'ucdp-ged-26.1': {
+    out: 'ucdp_ged_26.1.parquet',
+    local: '/sata_hdd_24tb/hf_data/__published/ucdp-ged/data/parquet/26.1/ged.parquet',
+    remote: 'https://huggingface.co/datasets/yuiseki/ucdp-ged/resolve/main/parquet/26.1/ged.parquet',
+    copy: true,
+  },
   // Natural Earth 10m admin 0, v5.1.1. Public domain.
   'ne-countries': {
     out: 'ne_10m_admin_0_countries.geojson',
