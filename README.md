@@ -1,12 +1,12 @@
 # map-from-scratch
 
-「X をしたいから地図を作って」という依頼ごとに、その目的だけを満たす最小で最速の地図レンダラーをほぼゼロから作り、計測で確かめるためのスキルとハーネスです。
+「X をしたいから地図を作って」という依頼ごとに、その目的だけを満たす最小で最速の地図の描画器をほぼゼロから作り、計測で確かめるためのスキルとハーネスです。
 
-汎用の地図エンジンは作りません。依頼ごとに描画器そのものを作り直します。平面でだけ見せたい依頼なら、3 次元描画の関心事の大半は最初から要りません。要らない機能を持たないことで、コードの量、メモリ、起動時間、描画負荷を減らします。
+汎用の地図エンジンは作りません。依頼ごとに描画器そのものを作り直します。平面でだけ見せたい依頼なら、3 次元描画に要る処理の大半は最初から要りません。要らない機能を持たないことで、コードの量、メモリ、起動時間、描画負荷を減らします。
 
 - 言語、描画 API、ランタイムは依頼に合わせて選ぶ (Canvas 2D、WebGL2、C + EGL/GLES3、マイコン向けの C など)。
-- 外部依存は使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
-- 要件はすべて数値の予算 (`spec.json` の `budgets`) にし、ハーネスが毎回測って合否を出す。
+- 外部ライブラリは使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
+- 要件はすべて、測定値の上限や下限 (予算。`spec.json` の `budgets`) にし、ハーネスが毎回測って合否を出す。
 
 ## 例
 
@@ -34,7 +34,7 @@
 | 05-tokyo-roads-native | C + EGL/GLES3 | 23 KB (実行ファイル) | 5357 KB gzip | 106 ms | 1.08 ms | 全部通過 5/5 |
 | 06-mcu-roadmap | C (MCU) | 988 B (.text) | 469 KB (.rodata) | - | 0.376 ms | 全部通過 6/6 |
 
-- フレームの列は、WebGL2 と ネイティブでは GPU 完了まで待った 1 フレームの時間です。01 はホバー中の rAF フレーム間隔、06 はホスト CPU での時間で、マイコン実機の時間ではありません。
+- フレームの列は、WebGL2 とネイティブでは GPU の処理が終わるまで待った 1 フレームの時間です。01 はホバー中の rAF フレーム間隔、06 はホスト CPU での時間で、マイコン実機の時間ではありません。
 - 01 と 02 はスマホ相当 (390×844、DPR 3、CPU 4 倍スロットル) で測っています。
 
 ### 汎用エンジンとの比較
@@ -46,7 +46,7 @@
 | 配るコード (gzip) | 3.4 KB | 286 KB | 83 分の 1 |
 | データ (gzip) | 463 KB | 1,178 KB (GeoJSON) | 2.5 分の 1 |
 | 初回描画 p50 | 227 ms | 1,144 ms | 5 分の 1 |
-| フレーム p95 (GPU 完了まで) | 1.28 ms | 5.2 ms (タイル生成後) / 6.9 ms (生成中) | 4〜5 分の 1 |
+| フレーム p95 (GPU の処理の終わりまで) | 1.28 ms | 5.2 ms (タイル生成後) / 6.9 ms (生成中) | 4〜5 分の 1 |
 | 1 フレームの JS 時間 p50 | 0.005 ms | 1.9 ms | |
 | 新しいズームでの描き直し待ち | なし | 33〜56 ms | |
 | タップの当たり判定 p95 | 0.9 ms | 2.8 ms | |
@@ -68,14 +68,14 @@ bin/mfs report         # 最新の結果を Markdown の表で出す
 bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:8080/examples/
 ```
 
-新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md)、嘘をついた計測は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
+新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
 
 ## ハーネス
 
 - `harness/cli.mjs`: 依存のない Node 24 の CLI。`bin/mfs` がコンテナの中で動かす。
-- ブラウザの描画器: headless Chromium を、自作の CDP クライアント (Node 組み込みの WebSocket を使う) で動かす。ページは `window.__mfsEmit` で計測値を返す。GPU が SwiftShader などのソフトウェアに落ちていたらエラーにする。
+- ブラウザの描画器: headless Chromium を、自作の CDP クライアント (Node 組み込みの WebSocket を使う) で動かす。ページは `window.__mfsEmit` で計測値を返す。GPU の代わりに SwiftShader などのソフトウェア描画が使われていたら、エラーにする。
 - ネイティブの描画器: `harness/native/mfs-exec.c` が fork/exec して、出力の各行にプロセス起動からの時刻を付ける。wait4 で CPU 時間と最大常駐メモリを取る。
-- 出荷物の大きさ: コードとデータのバイト数と gzip 後の大きさ。マイコン向けはオブジェクトの .text、.rodata、RAM (.data + .bss) を `llvm-size` で測る。
+- 配るものの大きさ: コードとデータのバイト数と gzip 後の大きさ。マイコン向けはオブジェクトの .text、.rodata、RAM (.data + .bss) を `llvm-size` で測る。
 
 ## データの出典
 
