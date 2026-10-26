@@ -87,7 +87,7 @@ bin/mfs serve 8080     # ブラウザの例を手で触る: http://localhost:808
 tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて GitHub Pages に公開する
 ```
 
-新しい依頼から描画器を作る手順は [skills/map-from-scratch/SKILL.md](skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](skills/map-from-scratch/references/pitfalls.md) にまとめています。
+新しい依頼から描画器を作る手順は [.agents/skills/map-from-scratch/SKILL.md](.agents/skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](.agents/skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](.agents/skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](.agents/skills/map-from-scratch/references/pitfalls.md) にまとめています。従来の `skills/map-from-scratch` は既存の参照を維持するためのリンクです。
 
 `ref-repos/` の 48 エンジンの issue、pull request、コミットログから、設計の判断とその代償、試して取りやめたことを話題ごとに抜き出し、[.agents/skills/](.agents/skills/) に 28 のスキル (ラベル配置、浮動小数点の精度、地形、3D 建物、Range リクエストなど) としてまとめています。どの主張にも出典を付け、出典と照らし合わせて確かめてあります。データの置き場所は [yuiseki-open-data](.agents/skills/yuiseki-open-data/SKILL.md) にあります。`.claude/skills` は `.agents/skills` へのリンクです。
 

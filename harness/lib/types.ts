@@ -49,7 +49,7 @@ export interface Spec {
   definition?: Definition;
 }
 
-// spec.yaml, as written (see skills/map-from-scratch/references/spec-yaml.md).
+// spec.yaml, as written (see .agents/skills/map-from-scratch/references/spec-yaml.md).
 export interface Definition {
   id: string;
   request: string;
