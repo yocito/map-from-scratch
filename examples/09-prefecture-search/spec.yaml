@@ -1,0 +1,39 @@
+id: 09-prefecture-search
+request: 日本の都道府県名を入力すると、その位置を地図上で見つけたい。
+requirements:
+  - id: find-prefecture
+    need: 入力に一致する都道府県の場所を地図で示す
+    unmeasured: 入力時に候補を強調する。自動検証は未実施。
+  - id: show-name
+    need: 候補の正式名称とコードを表示する
+    unmeasured: 検索結果として画面に表示する。自動検証は未実施。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/09-prefecture-search/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 2, mobile: true}
+  iterations: 1
+  scenarios: []
+datasets:
+  sources:
+    - id: ne-japan-prefectures
+      origin: Natural Earth 10m Admin 1 v5.1.1 の日本 47 都道府県
+      license: Public domain
+  outputs: [data/baked/01-prefecture-picker/prefectures.json]
+  preparation:
+    - 01 のベイク済み Path2D 用データを使用する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D と Path2D
+    language: TypeScript
+    gpu: none
+    code: [examples/09-prefecture-search/index.html, examples/09-prefecture-search/main.ts]
+    dependencies: []
+    why: 47 個の固定図形を検索で色分けするだけなので Canvas 2D で足りる
+  alternatives: []
+  not_doing: [パン, ズーム, タイル, 3D]
+verification:
+  checks: []
