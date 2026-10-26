@@ -66,12 +66,29 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    WebGPU is a valid choice for a renderer, but in this harness headless
    Chromium only gets SwiftShader for WebGPU, so a WebGPU example cannot be
    measured on the GPU here yet. Say so if you choose it.
-3. **Look it up in ref-repos.** For each sub-problem of the design (line
+3. **Design the data structure for the request, too.** The format the data
+   arrives in is often the real bottleneck. Decide what the renderer reads
+   first and most often (a view, a time step, a zoom level), and lay the
+   bytes out so that one or a few HTTP Range requests fetch exactly that:
+   index first, then blocks ordered by space (Hilbert, Morton) or time,
+   quantised, delta-coded, columnar where it helps. Read the ideas in
+   `ref-repos/yuiseki__maplibre-tile-spec` (MLT: columnar layout, FastPFOR,
+   dictionary and FSST strings, pre-tessellation) and
+   `ref-repos/kenjiyoshidahome2026-bit__ortho-earth/packages/geopbf`
+   (GPL-3), and the PMTiles spec. Measure the new structure against reading
+   the original format for the same views (bytes, requests, time to first
+   frame under `benchmarks.network`), and record both in
+   `performance_knowledge`. Bake-time tools: `tools/sources.ts`,
+   `tools/geo.ts`, `tools/pmtiles.ts`, the `duckdb` CLI (spatial),
+   `ogr2ogr`, `osmium`. Local copies: z.yuiseki.net/static is
+   `/sata_hdd_24tb/www/html/static/`, Hugging Face datasets of yuiseki are
+   under `/sata_hdd_24tb/hf_data/__published/`.
+4. **Look it up in ref-repos.** For each sub-problem of the design (line
    joins, polygon fill, tile decoding, label placement, picking, projection,
    globe camera), search `ref-repos/` (`rg -l` by concept, then read the few
    files that implement it) and note in `performance_knowledge` or a code
    comment which engine's approach you took or rejected and why.
-4. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
+5. **Scaffold** by copying the closest example to `examples/<nn>-<slug>/`:
    `spec.yaml`, `REQUEST.md` (the narrative: design and what was learnt),
    `bake.ts`, the renderer, and for browser examples `index.html` that loads
    `main.ts`, plus a `bench.ts` that `main.ts` imports only under `?bench`.
@@ -81,31 +98,31 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    `chosen.code` exactly what a user downloads. Shared bake helpers are in `tools/` (`sources.ts` for raw data,
    converted again when its settings change; `geo.ts` for projections,
    simplification, triangulation, clipping); add to them with tests.
-5. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)
+6. **Bake**: `bin/mfs bake <nn>`. Print counts (features, vertices, bytes)
    and look at them: an outlier bounding box or a 10x larger file than
    expected is a bug in the bake, not a fact about the data. Write the steps
    in `datasets.preparation`.
-6. **Write the renderer**, smallest first: get one frame on screen, then add
+7. **Write the renderer**, smallest first: get one frame on screen, then add
    interaction. Patterns that worked are in references/patterns.md; the
    browser plumbing (DPR-aware ResizeObserver, pointer to device pixels,
    one pending rAF) is easiest to copy from 02 or 07.
-7. **Write the bench**: first frame (say exactly when it starts and stops in
+8. **Write the bench**: first frame (say exactly when it starts and stops in
    `benchmarks.scenarios`; do not count loading the bench code), a camera
    path (`zoomPath` and `benchFrames` in `harness/page/bench.ts`, or the C
    equivalent), fixed views for the cheap and expensive ends
    (`benchFrames(gl, n, draw, {prefix: 'whole_'})` reports `whole_frame_ms`),
    interaction costs, and every check of `verification.checks` as
    `emit({check: id, pass, detail})`. Report the GPU (`info.gpu`).
-8. **Measure**: `bin/mfs bench <nn>`, then look at
+9. **Measure**: `bin/mfs bench <nn>`, then look at
    `results/<id>/screenshot.png`. Before believing a number, ask what it
    measures (references/pitfalls.md); note the machine's load, which moves
    time budgets far more than GPU time. Change one thing at a time; for a
    parameter sweep pass it through `MFS_PAGE_QUERY` and compare runs.
-9. **Record** what was learnt in `performance_knowledge` (finding, evidence
+10. **Record** what was learnt in `performance_knowledge` (finding, evidence
    with numbers, when it applies), including dead ends and corrected mistakes.
-10. **Optionally compare** with a general engine under `baselines/` (see
+11. **Optionally compare** with a general engine under `baselines/` (see
    `baselines/b02-maplibre`): same data, same viewport, same camera path.
-11. **Commit** when `bin/mfs test` passes and `bin/mfs bench <nn>` passes all
+12. **Commit** when `bin/mfs test` passes and `bin/mfs bench <nn>` passes all
    budgets and checks. `bin/mfs report` prints every example's latest numbers
    for the README.
 
@@ -122,3 +139,9 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
   `{"done":true}`.
 - Results go to `results/<id>/` (latest.json with budgets and checks,
   timestamped runs, screenshot, chrome.log). They are not committed.
+- Browser examples are published on GitHub Pages
+  (https://yuiseki.github.io/map-from-scratch/) by `tools/deploy-pages.sh`,
+  which builds the site (`tools/build-site.ts`), checks every page on it
+  (`bin/mfs bench <id> --site`) and pushes `gh-pages`. Pages must work as
+  plain static files with relative paths (no COOP/COEP there), and every
+  data file must stay under 100 MB.

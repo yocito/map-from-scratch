@@ -31,7 +31,9 @@ git -C "$TMP" -c user.name="$(git config user.name)" -c user.email="$(git config
 git -C "$TMP" push -q --force "$REMOTE" gh-pages
 
 # Turn Pages on the first time (branch gh-pages, root).
+# Pushing a gh-pages branch may already have turned it on (HTTP 409).
 if ! gh api "repos/$REPO/pages" >/dev/null 2>&1; then
-  gh api -X POST "repos/$REPO/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null
+  gh api -X POST "repos/$REPO/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+    || gh api "repos/$REPO/pages" >/dev/null
 fi
 echo "https://$(echo "$REPO" | cut -d/ -f1).github.io/$(echo "$REPO" | cut -d/ -f2)/"

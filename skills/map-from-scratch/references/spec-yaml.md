@@ -51,14 +51,17 @@ A run passes when every budget holds, every check of `verification` passes in
 every iteration, and no error was reported. A budget whose metric was never
 reported fails.
 
-Metrics come from four places:
+Metrics come from these places:
 
 - the renderer: anything it emits (`frame_ms`, `pick_ms`, `whole_frame_ms`
   from `benchFrames(..., {prefix: 'whole_'})`, counters);
 - the harness, browser: `first_frame_ms` is what the page emits (define it
-  in `benchmarks`), `js_heap_mb`, `transfer_kb` (uncompressed: the static
-  server does not gzip, and requests made by workers are not counted),
-  `browser_rss_mb`;
+  in `benchmarks`), `js_heap_mb`, `transfer_kb` and `requests` (all responses
+  of the page, uncompressed: the static server does not gzip; requests made
+  by workers are not counted), `browser_rss_mb`;
+- by convention, a renderer that reads data by HTTP Range emits
+  `range_requests` and `range_bytes` (per view or per scenario, named in
+  `benchmarks.scenarios`), counted in its own fetch wrapper;
 - the harness, native: `<mark>_ms` from `{"mark": ...}` (time since fork),
   `wall_ms`, `process_cpu_ms`, `peak_rss_mb`;
 - the harness, footprint: `code_bytes`, `code_gzip_bytes`, `data_bytes`,
@@ -76,6 +79,7 @@ How the renderer is run and what each measured scenario is.
 | `page` | browser: page path from the repository root; the harness adds `?bench=1` |
 | `viewport` | browser: `{width, height, device_scale_factor, mobile}` |
 | `cpu_throttle` | browser: CPU slowdown factor (4 for a phone) |
+| `network` | browser: `{name, latency_ms, download_mbps, upload_mbps}` emulated with CDP; e.g. 4G `{latency_ms: 60, download_mbps: 9}`. Use it whenever data is fetched while the map is used |
 | `cmd` | native: argv from the repository root |
 | `iterations` | runs; first frame and checks repeat per run |
 | `timeout_ms` | per run, default 120000 |
@@ -89,7 +93,7 @@ Where the data comes from and what the renderer receives.
 | --- | --- |
 | `bake` | argv run by `bin/mfs bake <id>` |
 | `sources` | list of `{id, origin, license}`; `id` names an entry of `tools/sources.ts` |
-| `outputs` | baked files the renderer loads; they are the footprint's data |
+| `outputs` | baked files (or directories) the renderer loads; they are the footprint's data and what GitHub Pages publishes (each file under 100 MB) |
 | `preparation` | the bake steps in words: projection, simplification, quantisation, ordering, encoding |
 
 Raw sources live in `tools/sources.ts` (converted once to `data/raw/`,
