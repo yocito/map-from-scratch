@@ -98,6 +98,30 @@ OvertureMaps/osm-pbf-parquet             osm-to-parquet    MIT
 kraina-ai/quackosm                       osm-to-geoparquet Apache-2.0
 osmcode/osmcoastline                     coastlines        GPL-3.0
 GIScience/ohsome-planet                  osm-history       GPL-3.0
+carbonplan/maps                          web-raster        see LICENSE
+carderne/zarr-gl                         web-zarr          MIT
+carbonplan/zarr-layer                    web-zarr          MIT
+NOC-OI/zarr-cesium                       3d-zarr           MIT
+nagix/mini-tokyo-3d                     web-3d-transit    MIT
+nagix/japan-eq-locator                   web-3d-events     MIT
+openinframap/openinframap                web-thematic      BSD-3-Clause
+zhu-xlab/GlobalBuildingAtlas             building-data     check data terms
+gboeing/osmnx                            osm-networks      MIT
+geopandas/geopandas                      python-spatial    BSD-3-Clause
+stac-utils/pystac                        stac-library      see LICENSE
+apache/sedona-db                         spatial-db        Apache-2.0
+pelias/pelias                            geocoder          MIT
+komoot/photon                            geocoder          Apache-2.0
+GeoDaCenter/geoda                        desktop-spatial   GPL-3.0
+opengeos/GeoLibre                        web-gis           MIT
+thkruz/keeptrack.space                   web-3d-sat        AGPL-3.0 (read only)
+sentinel-hub/sentinelhub-js              imagery-client    MIT
+sasgis/sas.planet.src                    desktop-imagery   GPL-3.0
+originalankur/maptoposter                static-map        MIT
+c2g-dev/city2graph                       spatial-graphs    BSD-3-Clause
+shashwatak/satellite-js                  orbit-math        MIT
+openstreetmap/id-tagging-schema          osm-schema        ISC
+osmlab/name-suggestion-index             osm-catalog       BSD-3-Clause
 EOF
 )
 
