@@ -1,0 +1,44 @@
+id: 23-taito-point-cloud
+request: 台東区の点群 PNG を表示したい。
+requirements:
+  - id: taito
+    need: 台東区の点群を 3D で見る
+    unmeasured: GSJ の統合点群 PNG から台東区周辺のタイルを選び、位置・標高・RGB を WebGL2 の点で描く。
+  - id: stream
+    need: 必要な範囲と解像度だけを読み込む
+    unmeasured: 視点距離でズームレベルを選び、中心周囲の 5×5 タイルを同時最大5件で取得する。
+  - id: attribution
+    need: 出典を示す
+    unmeasured: GSJ と東京都デジタルツイン実現プロジェクトへの帰属リンクを画面に表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/23-taito-point-cloud/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: []
+  sources:
+    - id: gsj-mixed-pcpng
+      origin: https://tiles.gsj.jp/tiles/pcpng/mixed/index.html
+      license: GSJ 公開タイルを参照し、GSJ と元データ提供元の東京都を画面に表示する。
+  outputs: []
+  preparation:
+    - GSJ の可逆 WebP タイルを必要時に取得し、点群 PNG 1.0 のカラム別 RGB 符号をブラウザで復号する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2、Fetch、createImageBitmap
+    language: TypeScript
+    gpu: hardware
+    code: [examples/23-taito-point-cloud/index.html, examples/23-taito-point-cloud/main.ts, examples/23-taito-point-cloud/decode.ts, examples/23-taito-point-cloud/render.ts]
+    dependencies: []
+    why: 点群 PNG の復号と表示だけに特化したレンダラーで、地図エンジンを読み込まない。
+  alternatives:
+    - GSJ の既存ビューアーは MapLibre と deck.gl を使うため、この例では採用しない
+  not_doing: [地図ラベル, 地形メッシュ, 点の分類, 汎用点群 PNG エンジン]
+verification:
+  checks: []
