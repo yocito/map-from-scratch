@@ -150,6 +150,7 @@ const LANDMARKS: Record<number, string> = {
 // get 4 storeys, typical of the mid-rise blocks east of the station.
 interface Solid { id: number; kind: string; name: string; ring: XY[]; h: number }
 const solids: Solid[] = [];
+const polys_park: XY[][] = [];   // for the bird's-eye ground, in EPSG:3857
 const heightOf = (t: Record<string, string>): number =>
   parseFloat(t.height) || (parseFloat(t['building:levels']) || 4) * 3.3;
 const layer: Record<string, XY[][]> = { park: [], plaza: [], building: [], station: [], landmark: [], dest: [] };
@@ -167,6 +168,7 @@ for (const r of polys) {
     : r.highway === 'pedestrian' || r.amenity === 'marketplace' ? 'plaza'
     : null;
   if (!kind) continue;
+  if (kind === 'park') polys_park.push(wkb(r.way as Uint8Array)[0].slice(0, -1));
   if (kind !== 'park' && kind !== 'plaza') {
     const outer = wkb(r.way as Uint8Array)[0];
     solids.push({ id, kind, name: LANDMARKS[id] ?? (id === DEST_BUILDING ? 'グランドスケープ池袋' : ''), ring: outer, h: heightOf(t) });
@@ -196,6 +198,8 @@ const underground = (r: Row, t: Record<string, string>) =>
 
 interface Way { id: number; name: string; hw: string; crossing: boolean; pts: XY[] }
 const walkWays: Way[] = [];
+const roadLines: [XY[], string][] = [];      // bird's-eye ground, EPSG:3857
+const namedRoads: [string, XY[]][] = [];
 const roadNames = new Map<string, string>();   // node (3857 "x,y") -> name of a car road through it
 const key = ([x, y]: XY) => `${x},${y}`;
 for (const r of lines) {
@@ -205,6 +209,8 @@ for (const r of lines) {
   if (hw && ROAD_CLASS[hw] && hw !== 'pedestrian' && name && !underground(r, t)) for (const p of pts) roadNames.set(key(p), name);
   const cls = hw ? ROAD_CLASS[hw] : r.railway === 'rail' ? 'rail' : null;
   if (!cls || (r.tunnel === 'yes' || Number(r.layer ?? 0) < 0)) continue;
+  if (cls !== 'rail' && cls !== 'expressway') roadLines.push([pts, cls]);
+  if (name && cls !== 'rail') namedRoads.push([name, pts]);
   if (cls === 'rail' && (t.service === 'yard' || t.service === 'siding')) continue;
   for (const piece of clipPolyline(pts.map(grid), [-20, -20, GRID + 20, GRID + 20])) {
     const g = round(simplify(piece as XY[], 0.7));
@@ -655,6 +661,170 @@ const views = VIEWS.map((v) => {
   return { title: v.title, at: grid(cam).map(Math.round), yaw: Math.round((yaw * 1000)) / 1000, ground: pathOf(ribbon.map((r) => round(r.pts)), true), walls: runs, labels };
 });
 
+// ---- Bird's-eye view -----------------------------------------------------
+// One fixed camera above the south-west, looking down at the walk. Same
+// approach as the eye-level views, plus roofs, the ground (block, parks,
+// main roads, the route) and a hidden-surface pass: every polygon is
+// rasterised into an id buffer here, in painter's order, and polygons that
+// end up with no visible pixel are not shipped.
+const BW = 1000, BH = 760, BIRD_REGION = 430;     // half-size of the ground square, metres
+const BIRD_PITCH = (52 * Math.PI) / 180, BIRD_DIST = 900, BIRD_HFOV = (42 * Math.PI) / 180;
+const BIRD_HEADING = (62 * Math.PI) / 180;        // looking towards east-north-east..north
+const bpalette: string[] = [];
+const bcolor = (hex: string) => { let i = bpalette.indexOf(hex); if (i < 0) { i = bpalette.length; bpalette.push(hex); } return i; };
+const shadeHex = (rgb: [number, number, number], f: number) => '#' + rgb.map((c) => Math.round(Math.min(255, c * f)).toString(16).padStart(2, '0')).join('');
+const startM: XY = routeRaw[0];
+const target: XY = [(startM[0] + destC[0]) / 2, (startM[1] + destC[1]) / 2];
+const bird = (() => {
+  // Camera in ground metres relative to the target, z up.
+  const fwdH: XY = [Math.cos(BIRD_HEADING), Math.sin(BIRD_HEADING)];
+  const camG: V3 = [-fwdH[0] * BIRD_DIST * Math.cos(BIRD_PITCH), -fwdH[1] * BIRD_DIST * Math.cos(BIRD_PITCH), BIRD_DIST * Math.sin(BIRD_PITCH)];
+  const f: V3 = [fwdH[0] * Math.cos(BIRD_PITCH), fwdH[1] * Math.cos(BIRD_PITCH), -Math.sin(BIRD_PITCH)];
+  const r: V3 = [fwdH[1], -fwdH[0], 0];
+  const u: V3 = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const focal = BW / 2 / Math.tan(BIRD_HFOV / 2);
+  const local = ([x, y]: XY): XY => [(x - target[0]) * cosLat, (y - target[1]) * cosLat];
+  const toCam = (p: XY, h: number): V3 => {
+    const [x, y] = local(p), d: V3 = [x - camG[0], y - camG[1], h - camG[2]];
+    return [d[0] * r[0] + d[1] * r[1] + d[2] * r[2], d[0] * u[0] + d[1] * u[1] + d[2] * u[2], d[0] * f[0] + d[1] * f[1] + d[2] * f[2]];
+  };
+  const project = (p: V3): XY => [BW / 2 + (focal * p[0]) / p[2], BH / 2 - (focal * p[1]) / p[2]];
+  const box: Box = [-4, -4, BW + 4, BH + 4];
+  const polys: { c: number; b: number; pts: XY[] }[] = [];
+  const add = (c: number, b: number, ring: V3[]) => {
+    const n = clipNear(ring);
+    if (n.length < 3) return;
+    const scr = clipRect(n.map(project), box);
+    if (scr.length >= 3) polys.push({ c, b, pts: scr });
+  };
+  const inRegion = (p: XY) => { const [x, y] = local(p); return Math.abs(x) <= BIRD_REGION && Math.abs(y) <= BIRD_REGION; };
+  const fromLocal = (x: number, y: number): XY => [target[0] + x / cosLat, target[1] + y / cosLat];
+  // Ground: the square, parks, main roads as 3D ribbons, the route on top.
+  const G = BIRD_REGION;
+  add(bcolor('#ebe7df'), -1, [fromLocal(-G, -G), fromLocal(G, -G), fromLocal(G, G), fromLocal(-G, G)].map((p) => toCam(p, 0)));
+  for (const r0 of polys_park) if (r0.some(inRegion)) add(bcolor('#cfe5c1'), -1, r0.map((p) => toCam(p, 0)));
+  const ribbon = (pts: XY[], halfW: number, h: number, c: number, b: number) => {
+    for (let i = 1; i < pts.length; i++) {
+      const [a, q] = [pts[i - 1], pts[i]];
+      if (!inRegion(a) && !inRegion(q)) continue;
+      const len = Math.hypot(q[0] - a[0], q[1] - a[1]);
+      if (!len) continue;
+      // Extend each piece by half a width so consecutive quads overlap at bends.
+      const ux = (q[0] - a[0]) / len, uy = (q[1] - a[1]) / len, w = halfW / cosLat;
+      const nx = -uy * w, ny = ux * w, ex = ux * w, ey = uy * w;
+      add(c, b, [[a[0] - ex + nx, a[1] - ey + ny], [q[0] + ex + nx, q[1] + ey + ny], [q[0] + ex - nx, q[1] + ey - ny], [a[0] - ex - nx, a[1] - ey - ny]].map((p) => toCam(p as XY, h)));
+    }
+  };
+  for (const [pts, cls] of roadLines) ribbon(pts, cls === 'major' ? 9 : cls === 'mid' ? 6 : 3.5, 0, bcolor('#fbfaf7'), -1);
+  ribbon(routeRaw, 4, 0.5, bcolor('#1a73e8'), -2);
+  // Buildings, far to near (nearest footprint point from the camera's ground
+  // position); within one building the walls far to near, then the roof.
+  const camXY = fromLocal(camG[0], camG[1]);
+  const order = solids.map((s, si) => ({ s, si, d: Math.min(...s.ring.map((p) => Math.hypot(p[0] - camXY[0], p[1] - camXY[1]))) }))
+    .filter(({ s }) => s.ring.some(inRegion) && Math.abs(area(s.ring)) * cosLat * cosLat >= 30).sort((p, q) => q.d - p.d);
+  for (const { s, si } of order) {
+    const ccw = area(s.ring) > 0;
+    const walls: { d: number; c: number; q: V3[] }[] = [];
+    for (let i = 0; i < s.ring.length - 1; i++) {
+      const [a, b] = [s.ring[i], s.ring[i + 1]];
+      const ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey);
+      if (!el) continue;
+      const nx = (ccw ? ey : -ey) / el, ny = (ccw ? -ex : ex) / el;
+      if (nx * (camXY[0] - a[0]) + ny * (camXY[1] - a[1]) <= 0) continue;
+      const lit = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1]);
+      walls.push({ d: Math.hypot((a[0] + b[0]) / 2 - camXY[0], (a[1] + b[1]) / 2 - camXY[1]), c: bcolor(shadeHex(BASE[s.kind], 0.62 + 0.25 * lit)), q: [toCam(a, 0), toCam(b, 0), toCam(b, s.h), toCam(a, s.h)] });
+    }
+    walls.sort((p, q) => q.d - p.d);
+    for (const w of walls) add(w.c, si, w.q);
+    add(bcolor(shadeHex(BASE[s.kind], 1.04)), si, s.ring.slice(0, -1).map((p) => toCam(p, s.h)));
+  }
+  // Hidden-surface pass: an id buffer at half resolution, even-odd scanline fill.
+  const IW = BW / 2, IH = BH / 2, ids = new Int32Array(IW * IH).fill(-1);
+  polys.forEach((p, pi) => {
+    const pts = p.pts.map(([x, y]) => [x / 2, y / 2]);
+    const ys = pts.map((q) => q[1]);
+    for (let y = Math.max(0, Math.floor(Math.min(...ys))); y <= Math.min(IH - 1, Math.ceil(Math.max(...ys))); y++) {
+      const sy = y + 0.5, xs: number[] = [];
+      for (let i = 0; i < pts.length; i++) {
+        const [a, b] = [pts[i], pts[(i + 1) % pts.length]];
+        if ((a[1] > sy) !== (b[1] > sy)) xs.push(a[0] + ((sy - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
+      }
+      xs.sort((m, n) => m - n);
+      for (let k = 0; k + 1 < xs.length; k += 2)
+        for (let x = Math.max(0, Math.ceil(xs[k] - 0.5)); x <= Math.min(IW - 1, Math.floor(xs[k + 1] - 0.5)); x++) ids[y * IW + x] = pi;
+    }
+  });
+  const seen = new Uint32Array(polys.length);
+  for (const id of ids) if (id >= 0) seen[id]++;
+  const kept = polys.filter((_, i) => seen[i] > 0);
+  const s0 = project(toCam(startM, 0));
+  // Street names keep off the route line, which is drawn over everything.
+  const routeScr = round(routeRaw.map((p) => project(toCam(p, 0.5))));
+  const routeAvoid: Box[] = [];
+  for (let i = 1; i < routeScr.length; i++) {
+    const [a, b] = [routeScr[i - 1], routeScr[i]], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 6));
+    for (let j = 0; j <= n; j++) { const x = a[0] + ((b[0] - a[0]) * j) / n, y = a[1] + ((b[1] - a[1]) * j) / n; routeAvoid.push([x - 8, y - 8, x + 8, y + 8]); }
+  }
+  // Labels on what is visible: buildings at their topmost visible pixel,
+  // streets on visible ground near their middle, the start at the route.
+  const owner = (x: number, y: number) => { const i = ids[Math.floor(y / 2) * IW + Math.floor(x / 2)]; return i >= 0 ? polys[i].b : -9; };
+  const labels: [string, number, number, number, number][] = [];   // text, x, y, angle, kind (0 street, 1 landmark, 2 dest, 3 start)
+  const taken: Box[] = [];
+  const tryLabel = (text: string, x: number, y: number, a: number, size: number, kind: number) => {
+    const b = boxOf(text, x, y, size, a);
+    if (b[0] < 4 || b[1] < 4 || b[2] > BW - 4 || b[3] > BH - 4 || taken.some((o) => hit(o, b))) return false;
+    if (kind === 0 && routeAvoid.some((o) => hit(o, b))) return false;
+    taken.push(b); labels.push([text, Math.round(x), Math.round(y), Math.round(a * 1000) / 1000, kind]);
+    return true;
+  };
+  const visibleTop = (si: number): XY | null => {
+    for (let y = 0; y < IH; y++) {
+      let n = 0, sx = 0;
+      for (let x = 0; x < IW; x++) { const i = ids[y * IW + x]; if (i >= 0 && polys[i].b === si) { n++; sx += x; } }
+      if (n >= 3) return [(sx / n) * 2, y * 2];
+    }
+    return null;
+  };
+  const destIdx = solids.findIndex((s) => s.id === DEST_BUILDING);
+  const dt = visibleTop(destIdx);
+  if (!dt) throw new Error("bird's-eye: destination not visible");
+  tryLabel('グランドシネマサンシャイン', dt[0], dt[1] - 72, 0, 40, 2);
+  tryLabel('（グランドスケープ池袋）', dt[0], dt[1] - 22, 0, 30, 2);
+  tryLabel('池袋駅 東口', s0[0] - 20, s0[1] + 34, 0, 34, 3) || tryLabel('池袋駅 東口', s0[0] - 20, s0[1] - 34, 0, 34, 3);
+  solids.forEach((s, si) => {
+    if (!s.name || si === destIdx) return;
+    const t = visibleTop(si);
+    if (t) tryLabel(s.name, t[0], t[1] - 22, 0, 32, 1);
+  });
+  const named = new Set<string>();
+  const byDist = namedRoads.filter(([n]) => STREETS.includes(n))
+    .map(([n, pts]) => ({ n, pts, d: Math.min(...pts.map((p) => Math.hypot(...local(p)))) })).sort((m, q) => m.d - q.d);
+  for (const { n: name, pts } of byDist) {
+    if (named.has(name)) continue;
+    // The visible stretch of the road nearest the target, labelled along its screen direction.
+    const cands = pts.filter(inRegion).map((p) => ({ p, d: Math.hypot(...local(p)) })).sort((m, n) => m.d - n.d);
+    for (const { p } of cands.slice(0, 40)) {
+      const i = pts.indexOf(p), q = pts[Math.min(pts.length - 1, i + 1)] === p ? pts[Math.max(0, i - 1)] : pts[i + 1];
+      const [a, b] = [project(toCam(p, 0)), project(toCam(q, 0))];
+      let ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      if (ang > Math.PI / 2) ang -= Math.PI; else if (ang <= -Math.PI / 2) ang += Math.PI;
+      if (a[0] < 0 || a[0] > BW || a[1] < 0 || a[1] > BH || owner(a[0], a[1]) !== -1) continue;
+      if (tryLabel(name, a[0], a[1], ang, 30, 0)) { named.add(name); break; }
+    }
+  }
+  const runs: [number, string][] = [];
+  for (const p of kept) {
+    const d = pathOf([round(p.pts)], true);
+    const last = runs[runs.length - 1];
+    if (last && last[0] === p.c) last[1] += d; else runs.push([p.c, d]);
+  }
+  console.log(`bird's-eye: ${order.length} buildings, ${polys.length} polygons, ${kept.length} visible, ${runs.length} runs, labels ${labels.map((l) => l[0]).join(', ')}`);
+  // The route again, on top of everything as a dashed line, because buildings
+  // south of the street hide most of it from any view from the south.
+  const end = project(toCam(goalXY, 0.5));
+  return { w: BW, h: BH, palette: bpalette, polys: runs, labels, route: pathOf([routeScr], false), start: s0.map(Math.round), goal: end.map(Math.round) };
+})();
+
 // ---- Write ---------------------------------------------------------------
 const minutes = Math.ceil(routeM / WALK_M_PER_MIN);
 const out = {
@@ -678,5 +848,8 @@ writeFileSync(`${OUT}/map.json`, json);
 const vjson = JSON.stringify({ w: VW, h: VH, horizon: HORIZON, palette, list: views.map(({ at: _a, yaw: _y, ...v }) => v) });
 writeFileSync(`${OUT}/views.json`, vjson);
 console.log(`views.json: ${vjson.length} bytes`);
+const bjson = JSON.stringify(bird);
+writeFileSync(`${OUT}/birdseye.json`, bjson);
+console.log(`birdseye.json: ${bjson.length} bytes`);
 const cinema = grid(pointOf(DEST_NODE));
 console.log(`map.json: ${json.length} bytes; buildings ${layer.building.length} (${dropped} tiny dropped), labels ${placed.length}, walk ${out.walk.m} m / ${minutes} min, cinema node at ${cinema.map(Math.round)}`);

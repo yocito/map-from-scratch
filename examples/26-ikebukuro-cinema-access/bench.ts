@@ -21,6 +21,11 @@ export async function run(view: { canvas: HTMLCanvasElement; draw: () => void; s
   // so time from the size change to the end of the frame that shows it:
   // ResizeObserver runs after rAF callbacks and before paint, so the second
   // rAF after the change follows the repainted frame.
+  // Start only after the bird's-eye and eye-level views are drawn: they load
+  // after the first frame and would otherwise land inside these frames.
+  while (!performance.getEntriesByName('views-shown').length) await raf();
+  emit({ metric: 'views_shown_ms', value: performance.getEntriesByName('views-shown')[0].startTime });
+  await raf(); await raf();
   const el = canvas.parentElement!;
   const resize: number[] = [];
   const redraw: number[] = [];
@@ -122,9 +127,6 @@ export async function run(view: { canvas: HTMLCanvasElement; draw: () => void; s
 
   // views-drawn: every eye-level view has sky, buildings and the route on
   // the screen, and the destination is red where it is labelled.
-  while (!performance.getEntriesByName('views-shown').length) await raf();
-  emit({ metric: 'views_shown_ms', value: performance.getEntriesByName('views-shown')[0].startTime });
-  await raf(); await raf();
   const vs: Views = await (await fetch('../../data/baked/26-ikebukuro-cinema-access/views.json')).json();
   const figs = [...document.querySelectorAll<HTMLCanvasElement>('#views canvas')];
   const per = figs.map((c, i) => {
@@ -135,6 +137,18 @@ export async function run(view: { canvas: HTMLCanvasElement; draw: () => void; s
     return { route: +(routeBlue / n).toFixed(3), dest: +(destRed / n).toFixed(3), labelled: dest };
   });
   emit({ check: 'views-drawn', pass: figs.length === vs.list.length && per.every((v) => v.route > 0.02 && (!v.labelled || v.dest > 0.003)), detail: per });
+
+  // bird-drawn: the bird's-eye canvas shows the destination red and the
+  // dashed route blue.
+  const bc = document.querySelector<HTMLCanvasElement>('#bird canvas');
+  let bird = { route: 0, dest: 0 };
+  if (bc) {
+    const d = bc.getContext('2d')!.getImageData(0, 0, bc.width, bc.height).data;
+    let n = 0, rb = 0, dr = 0;
+    for (let j = 0; j < d.length; j += 4 * 5) { n++; const p = [d[j], d[j + 1], d[j + 2]]; if (isBlue(p)) rb++; else if (p[0] > 180 && p[1] < 90 && p[2] < 80) dr++; }
+    bird = { route: +(rb / n).toFixed(4), dest: +(dr / n).toFixed(4) };
+  }
+  emit({ check: 'bird-drawn', pass: !!bc && bird.route > 0.002 && bird.dest > 0.003, detail: bird });
 
   emit({ info: { labels: map.labels.length, walk_m: map.walk.m, canvas: [W, H], timer_resolution_isolated: crossOriginIsolated } });
   emit({ done: true });

@@ -16,12 +16,16 @@ requirements:
     need: 途中の目印の建物がどう見えるかわかる
     rationale: 追加の依頼「目印になる建物がポイントポイントでどんなふうに見えるのか、シミュレーションしてレンダリングして挿入できる？」。経路上の 3 地点から目の高さで見た建物の立体を、地図の下に模式図として出す
     unmeasured: 正しさの要件なので views-drawn で確かめる。見え方の正しさ (建物の高さ) は OSM のタグに依存し、高さのない 59% の建物は 4 階建てと仮定している
+  - id: birds-eye
+    need: 鳥瞰図でも見られる
+    rationale: 追加の依頼「鳥瞰図っぽい地図にもできますか？」→「追加でお願いします」。平面の地図は残し、南西の上空から見下ろした図を 1 枚足す
+    unmeasured: 正しさの要件なので bird-drawn で確かめる。高さは立体図と同じく、記録のない建物を 4 階建てと仮定している
   - id: readable-on-phone
     need: スマホの画面で文字が読める
     rationale: 道案内の地図は歩きながらスマホで見る。390 CSS px 幅で最小の文字 11 px 以上、文字同士が重ならない
   - id: light-page
     need: 案内ページに貼っても重くならない
-    rationale: 映画館の案内や記事に貼る部品なので、コードは数 KB、データは写真 1 枚より小さく (gzip 合計 40 KB 以下。立体図 3 枚を足す前は 25 KB としていた)
+    rationale: 映画館の案内や記事に貼る部品なので、コードは数 KB、データは写真 1 枚より小さく。最初に読むのは地図だけ (gzip 約 15 KB) で、鳥瞰図と立体図は地図を表示した後に読む。合計は gzip 75 KB 以下 (立体図 3 枚を足す前は 25 KB、鳥瞰図を足す前は 40 KB としていた)
   - id: quick-start
     need: 開いてすぐ地図が出る
     rationale: 4G (60 ms, 9 Mbps) と CPU 4 倍スロットルで、初回描画 p50 600 ms 以下
@@ -33,9 +37,9 @@ evaluation:
   budgets:
     - {metric: min_label_px, max: 100, min: 11, unit: px, requirement: readable-on-phone}
     - {metric: label_overlaps, max: 0, unit: count, requirement: readable-on-phone}
-    - {metric: code_gzip_bytes, max: 4500, unit: B, requirement: light-page}
-    - {metric: data_gzip_bytes, max: 35000, unit: B, requirement: light-page}
-    - {metric: total_gzip_bytes, max: 40000, unit: B, requirement: light-page}
+    - {metric: code_gzip_bytes, max: 5500, unit: B, requirement: light-page}
+    - {metric: data_gzip_bytes, max: 70000, unit: B, requirement: light-page}
+    - {metric: total_gzip_bytes, max: 75000, unit: B, requirement: light-page}
     - {metric: first_frame_ms, stat: p50, max: 600, unit: ms, requirement: quick-start}
     - {metric: resize_frame_ms, stat: p95, max: 100, unit: ms, requirement: smooth}
   gates: [エラーがない, verification の check がすべて通る]
@@ -52,7 +56,7 @@ benchmarks:
       what: ナビゲーション開始から、map.json を読み mount() で地図を描いた後の 2 回目の rAF まで。main.ts が performance.mark('map-shown') を打ち、bench.ts の読み込みは含めない
       metrics: [first_frame_ms]
     - id: views
-      what: 地図の表示後に views.json を読み、立体図 3 枚を描き終えた時点 (main.ts の performance.mark('views-shown'))。予算はなく記録のみ
+      what: 地図の表示後に birdseye.json と views.json を読み、鳥瞰図 1 枚と立体図 3 枚を描き終えた時点 (main.ts の performance.mark('views-shown'))。予算はなく記録のみ
       metrics: [views_shown_ms]
     - id: resize
       what: 地図の幅を 358 px と 300 px に交互に 20 回変え、変更から 2 回目の rAF (描き直した地図のフレームの後) までを測る。あわせて全体を描く命令を出す時間 60 回と、何も描かないときの rAF 間隔 60 回
@@ -73,7 +77,7 @@ datasets:
     - id: osm-tokyo23-point
       origin: 同 planet_osm_point
       license: ODbL 1.0 (© OpenStreetMap contributors)
-  outputs: [data/baked/26-ikebukuro-cinema-access/map.json, data/baked/26-ikebukuro-cinema-access/views.json]
+  outputs: [data/baked/26-ikebukuro-cinema-access/map.json, data/baked/26-ikebukuro-cinema-access/birdseye.json, data/baked/26-ikebukuro-cinema-access/views.json]
   preparation:
     - 3 つの Parquet のフッターを HTTP Range で読み、bbox 列の行グループ統計が枠 (+150 m) に触れる行グループだけを読む (102 個中 25 個)。読んだ範囲は data/raw/osm-tokyo23-*.ranges/ にキャッシュする
     - 枠は東口(中央)と映画館の中間を中心にした 700 m 四方。EPSG:3857 から 1,000 単位のグリッド (1 単位 0.7 m、北が上) へ一次変換する
@@ -132,6 +136,15 @@ performance_knowledge:
     evidence: 139.711-139.719°E、35.728-35.733°N の building ポリゴンを数えた
     applies_when: OSM の建物を立体にする例。PLATEAU のある地域ではそちらの高さを使える
 
+  - id: birds-eye-id-buffer
+    finding: 鳥瞰図では、ベイク時に画家のアルゴリズムの順で多角形を ID バッファ (半分の解像度) にラスタ化し、1 画素も見えない多角形を捨てると、データが約 3 割減る
+    evidence: 半径 430 m の 1,053 棟で多角形 3,259 枚のうち見えるのは 2,489 枚。birdseye.json 87.9 KB (gzip 31.4 KB)。範囲を 520 m、30 m² 未満の建物も入れた最初の版は 4,907 枚中 3,417 枚、118 KB (gzip 40.6 KB)
+    applies_when: 固定視点の 3D 図をベイクして配るとき
+  - id: route-over-buildings
+    finding: 南側の上空から見ると、東西の通りを歩くルートは南側の建物にほぼ隠れる。見下ろす角度を上げても足りず、ルートは建物の上に破線で重ねて描く
+    evidence: 見下ろし 42° ではサンシャイン通りの区間がほぼ見えなかった。52° にして破線を重ねると、全区間が見える
+    applies_when: 鳥瞰図に経路を描くとき
+
 architecture_selection:
   chosen:
     platform: browser
@@ -140,7 +153,7 @@ architecture_selection:
     gpu: none
     code: [examples/26-ikebukuro-cinema-access/index.html, examples/26-ikebukuro-cinema-access/main.ts]
     dependencies: []
-    why: 縮尺も範囲も固定の 1 枚の案内図なので、描く形はすべてベイク時に決まる。層ごとに 1 本のパス文字列を Path2D に渡し、数十個のラベルを fillText で描くだけで足りる。目線の立体図も視点が固定なので、ベイク時に画面座標まで投影した多角形を同じ Path2D で塗る
+    why: 縮尺も範囲も固定の 1 枚の案内図なので、描く形はすべてベイク時に決まる。層ごとに 1 本のパス文字列を Path2D に渡し、数十個のラベルを fillText で描くだけで足りる。目線の立体図と鳥瞰図も視点が固定なので、ベイク時に画面座標まで投影した多角形を同じ Path2D で塗る
   alternatives:
     - option: WebGL2
       rejected_because: 三角形分割、線の太さのシェーダ、文字のグリフアトラスが要り、コードが何倍にもなる。固定の 1 枚では描画性能が要らない
@@ -178,5 +191,9 @@ verification:
       what: 目線の立体図 3 枚が描かれ、どれにもルートの青が出ていて、目的地の名前を出した図では目的地の赤の壁が見えている
       how: 各図の canvas のピクセルを 7 画素おきに調べ、ルートの青と目的地の赤の割合を数える
       expected: 3 枚、青 2% 超、名前を出した図では赤 0.3% 超
+    - id: bird-drawn
+      what: 鳥瞰図が描かれ、目的地の赤い建物と、建物の上に重ねたルートの青が見えている
+      how: 鳥瞰図の canvas のピクセルを 5 画素おきに調べ、ルートの青と目的地の赤の割合を数える
+      expected: 青 0.2% 超、赤 0.3% 超
   harness:
     - canvas の contextlost が起きたらエラーにする
