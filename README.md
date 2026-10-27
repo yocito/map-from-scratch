@@ -9,7 +9,7 @@
 - 描画エンジンとして外部ライブラリは使わない。ポリゴンの三角形分割には `vendor/earcut`、例22の Draco 圧縮建物データの復号には版を固定したデコーダーを使う。
 - 各例を `spec.yaml` で定義する。要件 (requirements)、評価 (evaluation)、計測 (benchmarks)、データ (datasets)、性能の知見 (performance_knowledge)、構成の選択 (architecture_selection)、検証 (verification) の 7 節からなる。
 - 計測済みの例では要件を測定値の上限や下限 (予算) にし、ハーネスが合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。未計測の例はその旨を明記する。
-- 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 48) の解き方を読んで参考にする。
+- 描画器を作るたびに、`ref-repos/` に集めた地図エンジン、空間処理ライブラリ、データ変換ツールの解き方を読んで参考にする。
 
 ## 例
 
@@ -81,7 +81,7 @@ MapLibre は Web メルカトルで描くので、投影法は 02 (Equal Earth) 
 ホストに要るのは Docker と、GPU を使う例では nvidia container runtime だけです。ハーネス (依存なしの Node 24)、C のビルド、Chromium、データ準備 (GDAL、osmium) はすべてコンテナの中で動きます。
 
 ```sh
-ref-repos/clone.sh     # 参照する地図エンジンを集める (浅いクローン、約 8 GB)
+ref-repos/clone.sh     # 参照する地図エンジンや空間データ処理ツールを集める (浅いクローン)
 bin/mfs image          # ベースイメージを作る
 bin/mfs test           # ハーネスとベイク用ヘルパのテスト
 bin/mfs bake all       # データを用意する (原データの場所は tools/sources.ts)
@@ -94,7 +94,7 @@ tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて 
 
 新しい依頼から描画器を作る手順は [.agents/skills/map-from-scratch/SKILL.md](.agents/skills/map-from-scratch/SKILL.md) に、`spec.yaml` の書き方は [spec-yaml.md](.agents/skills/map-from-scratch/references/spec-yaml.md) にあります。うまくいった設計は [patterns.md](.agents/skills/map-from-scratch/references/patterns.md) に、誤った数値を出した計測とその見つけ方は [pitfalls.md](.agents/skills/map-from-scratch/references/pitfalls.md) にまとめています。従来の `skills/map-from-scratch` は既存の参照を維持するためのリンクです。
 
-`ref-repos/` の 48 エンジンの issue、pull request、コミットログから、設計の判断とその代償、試して取りやめたことを話題ごとに抜き出し、[.agents/skills/](.agents/skills/) に 28 のスキル (ラベル配置、浮動小数点の精度、地形、3D 建物、Range リクエストなど) としてまとめています。どの主張にも出典を付け、出典と照らし合わせて確かめてあります。データの置き場所は [yuiseki-open-data](.agents/skills/yuiseki-open-data/SKILL.md) にあります。`.claude/skills` は `.agents/skills` へのリンクです。
+先に収集した 48 エンジンの issue、pull request、コミットログから、設計の判断とその代償、試して取りやめたことを話題ごとに抜き出し、[.agents/skills/](.agents/skills/) に 28 のスキル (ラベル配置、浮動小数点の精度、地形、3D 建物、Range リクエストなど) としてまとめています。どの主張にも出典を付け、出典と照らし合わせて確かめてあります。データの置き場所は [yuiseki-open-data](.agents/skills/yuiseki-open-data/SKILL.md) にあります。`.claude/skills` は `.agents/skills` へのリンクです。
 
 ## ハーネス
 

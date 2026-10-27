@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Clone the map engines and renderers that map-from-scratch reads from.
+# Clone the map engines, spatial libraries and data tools that
+# map-from-scratch reads from.
 #
 #   ref-repos/clone.sh                 clone everything missing (shallow)
 #   ref-repos/clone.sh --update        also bring existing clones up to date
@@ -68,6 +69,35 @@ galileo-map/galileo                       rust              Apache-2.0/MIT
 podusowski/walkers                        rust              MIT
 SciTools/cartopy                          python-static     BSD-3-Clause
 flopp/go-staticmaps                       go-static         MIT
+protomaps/PMTiles                         tile-container    see LICENSE
+protomaps/go-pmtiles                      tile-container    BSD-3-Clause
+felt/tippecanoe                           tile-compiler     BSD-2-Clause
+onthegomap/planetiler                    tile-compiler     Apache-2.0
+openmaptiles/planetiler-openmaptiles      tile-schema       see LICENSE
+systemed/tilemaker                       tile-compiler     see LICENSE
+openmaptiles/openmaptiles                 tile-schema       see LICENSE
+maptiler/tileserver-gl                   tile-server       see LICENSE
+developmentseed/titiler                  raster-server     MIT
+developmentseed/morecantile              tile-matrix       MIT
+mapterhorn/mapterhorn                     terrain-tiles     BSD-3-Clause
+PDAL/PDAL                                point-cloud       see LICENSE
+OSGeo/gdal                               spatial-io        see LICENSE
+OSGeo/PROJ                               projection        see LICENSE
+libgeos/geos                             geometry          LGPL-2.1
+google/s2geometry                        spatial-index     Apache-2.0
+uber/h3                                  spatial-index     Apache-2.0
+Turfjs/turf                              web-geometry      MIT
+ibesora/vt-optimizer                     tile-optimizer    MIT
+placemark/placemark                      web-geo-editor    MIT
+osmandapp/OsmAnd                         native-mobile     see LICENSE
+osmandapp/OsmAnd-iOS                     native-mobile     see LICENSE
+osmandapp/OsmAnd-resources               map-resources     see LICENSE
+osmcode/libosmium                        osm-pbf-library   BSL-1.0
+osmcode/osmium-tool                      osm-pbf-tool      GPL-3.0
+OvertureMaps/osm-pbf-parquet             osm-to-parquet    MIT
+kraina-ai/quackosm                       osm-to-geoparquet Apache-2.0
+osmcode/osmcoastline                     coastlines        GPL-3.0
+GIScience/ohsome-planet                  osm-history       GPL-3.0
 EOF
 )
 
