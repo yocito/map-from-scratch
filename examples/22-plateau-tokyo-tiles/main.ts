@@ -9,10 +9,13 @@ const canvas = document.getElementById('map') as HTMLCanvasElement;
 const status = document.getElementById('status')!;
 const scale = document.getElementById('scale')!;
 const renderer = createRenderer(canvas);
-const camera: Camera = { x: 0, y: 0, distance: 7000, yaw: 0, pitch: 56, width: 1, height: 1 };
+const params = new URLSearchParams(location.search);
+const requestedPitch = Number(params.get('pitch'));
+const camera: Camera = { x: 0, y: 0, distance: 3500, yaw: 0, pitch: requestedPitch >= 15 && requestedPitch <= 85 ? requestedPitch : 70, width: 1, height: 1 };
+const targetPixels = Math.max(8, Math.min(64, Number(params.get('sse')) || 16));
 interface Box { center: [number, number, number]; radius: number }
 interface View { eye: [number, number, number]; forward: [number, number, number]; right: [number, number, number]; up: [number, number, number]; tanX: number; tanY: number }
-interface Tile { box: Box; error: number; depth: number; url: string | null; children: Tile[]; mesh: Mesh | null; loading: boolean; failed: boolean; lastUse: number }
+interface Tile { box: Box; error: number; depth: number; url: string | null; children: Tile[]; mesh: Mesh | null; loading: boolean; failed: boolean; everLoaded: boolean; lastUse: number }
 interface City { url: string; box: Box; root: Tile | null; loading: boolean; failed: boolean }
 let cities: City[] = [], scheduled = false, pending = 0, cityPending = 0, gpuBytes = 0, received = 0, requests = 0, cacheHits = 0, lastError = '';
 const queue = new Set<Tile>();
@@ -34,11 +37,11 @@ async function tileBytes(url: string): Promise<ArrayBuffer> {
   if (!response.ok) throw new Error(`建物タイル: HTTP ${response.status}`);
   const bytes = await response.arrayBuffer();
   received += bytes.byteLength; requests++;
-  if (cache && bytes.byteLength <= 8 * 1048576) {
+  if (cache && bytes.byteLength <= 32 * 1048576) {
     void cache.put(url, new Response(bytes)).then(async () => {
       // Keep the useful nearby set without filling the origin's storage.
       const keys = await cache.keys();
-      for (const key of keys.slice(0, Math.max(0, keys.length - 96))) await cache.delete(key);
+      for (const key of keys.slice(0, Math.max(0, keys.length - 256))) await cache.delete(key);
     }).catch(() => {});
   }
   return bytes;
@@ -48,7 +51,7 @@ function node(raw: any, base: string, depth = 0): Tile {
   if (!raw.boundingVolume?.region) throw new Error('region 以外の 3D Tiles 境界です');
   return { box: regionSphere(raw.boundingVolume.region as Region), error: raw.geometricError ?? 0, depth,
     url: raw.content?.uri ? new URL(raw.content.uri, base).href : null,
-    children: (raw.children ?? []).map((child: any) => node(child, base, depth + 1)), mesh: null, loading: false, failed: false, lastUse: 0 };
+    children: (raw.children ?? []).map((child: any) => node(child, base, depth + 1)), mesh: null, loading: false, failed: false, everLoaded: false, lastUse: 0 };
 }
 function schedule() {
   if (scheduled) return;
@@ -77,7 +80,7 @@ function requestCity(city: City) {
 }
 function pumpCities() {
   for (const city of cityQueue) {
-    if (cityPending >= 4) break;
+    if (cityPending >= 6) break;
     cityQueue.delete(city);
     if (city.root || city.loading) continue;
     city.loading = true; cityPending++;
@@ -99,11 +102,12 @@ function pumpTiles() {
   });
   queue.clear();
   for (const tile of targets) {
-    if (pending >= 5) break;
+    if (pending >= 16) break;
     if (!tile.url || tile.mesh || tile.loading || tile.failed) continue;
     tile.loading = true; pending++;
     tileBytes(tile.url).then(decodeTile).then(geometry => {
       tile.mesh = renderer.upload(geometry);
+      tile.everLoaded = true;
       gpuBytes += tile.mesh.bytes;
       loaded.add(tile);
     }).catch(reason => { tile.failed = true; lastError = String(reason); })
@@ -115,11 +119,10 @@ function choose(tile: Tile, budget: { count: number }, frame: View): { ready: bo
   if (budget.count >= 240) return { ready: false, meshes: [] };
   budget.count++;
   // Load a coarse parent first; only descend once it can cover its children.
-  if (tile.url && !tile.mesh) { enqueue(tile); return { ready: false, meshes: [] }; }
+  if (tile.url && !tile.mesh && !tile.everLoaded) { enqueue(tile); return { ready: false, meshes: [] }; }
   const distance = Math.max(1, Math.hypot(tile.box.center[0] - frame.eye[0], tile.box.center[1] - frame.eye[1], tile.box.center[2] - frame.eye[2]) - tile.box.radius);
   const errorPixels = tile.error * Math.max(1, canvas.clientHeight) / (2 * Math.tan(Math.PI / 6) * distance);
-  // Far views value coverage over leaf geometry. Zooming in lowers the error allowance.
-  const targetPixels = Math.max(16, Math.min(64, camera.distance / 110));
+  // Keep distant building coverage dense enough to avoid sparse parent tiles.
   if (tile.children.length && (!tile.url || errorPixels > targetPixels) && budget.count < 240) {
     const children = tile.children.filter(child => visible(child.box, frame))
       .sort((a, b) => Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y) - Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y))
@@ -144,10 +147,10 @@ function draw() {
   const meshes = nearby.flatMap(city => city.root ? choose(city.root, { count: 0 }, frame).meshes : []);
   pumpTiles();
   renderer.draw(camera, meshes);
-  if (gpuBytes > 160 * 1048576) {
+  if (gpuBytes > 512 * 1048576) {
     const old = [...loaded].filter(tile => performance.now() - tile.lastUse > 15000).sort((a, b) => a.lastUse - b.lastUse);
     for (const tile of old) {
-      if (gpuBytes < 128 * 1048576) break;
+      if (gpuBytes < 384 * 1048576) break;
       if (tile.mesh) { gpuBytes -= tile.mesh.bytes; renderer.remove(tile.mesh); tile.mesh = null; loaded.delete(tile); }
     }
   }
@@ -156,14 +159,17 @@ function draw() {
 }
 
 const places: Record<string, [number, number, number]> = {
-  tokyo: [139.76712, 35.68124, 7000], shinjuku: [139.7006, 35.6938, 4500],
+  tokyo: [139.76712, 35.68124, 3500], shinjuku: [139.7006, 35.6938, 4500],
   shibuya: [139.7016, 35.6580, 4000], ueno: [139.7774, 35.7138, 3500],
   odaiba: [139.7757, 35.6264, 5500], ikebukuro: [139.7109, 35.7289, 4500],
 };
 function setPlace(name: string) {
   const place = places[name];
   if (!place) return;
-  [camera.x, camera.y] = at(place[0], place[1]); camera.distance = place[2]; schedule();
+  const requestedDistance = Number(params.get('distance'));
+  [camera.x, camera.y] = at(place[0], place[1]);
+  camera.distance = requestedDistance >= 300 && requestedDistance <= 80000 ? requestedDistance : place[2];
+  schedule();
 }
 document.querySelectorAll<HTMLButtonElement>('[data-place]').forEach(button => button.addEventListener('click', () => {
   setPlace(button.dataset.place!);

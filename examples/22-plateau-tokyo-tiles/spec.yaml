@@ -9,7 +9,7 @@ requirements:
     unmeasured: b3dm と直接 glb 内の Draco 圧縮 glTF を復号し、Y-up を Z-up に変換して WebGL2 で描く。
   - id: stream
     need: 広域データを一度に取得しない
-    unmeasured: region、視錐台、距離に応じた geometricError でタイルを選ぶ。親を先に読み、建物タイルは上限96件の Cache Storage に保存する。
+    unmeasured: region、視錐台、16ピクセルの geometricError でタイルを選ぶ。親を先に読み、32 MiB以下の建物タイルを上限256件の Cache Storage に保存する。
   - id: attribution
     need: 出典を示す
     unmeasured: PLATEAU と各自治体のデータを使うことをページに表示する。
@@ -31,14 +31,13 @@ datasets:
   preparation:
     - 複合 tileset.json と東京23区の tileset.json をブラウザで読み、可視タイルの b3dm または glb だけを取得する
 performance_knowledge:
-  - finding: 親タイル到着前の子孫要求と、遠景でも5ピクセルまで細分化する条件が東京駅視点の長い通信につながっていた。
+  - finding: 広域の許容誤差64ピクセルは建物が散在する表示になった。東京駅3.5 km・16ピクセルでは密度が改善し、初回の通信は45秒時点までに終了した。
     evidence: >-
-      公開版を Chromium の 800×600 ビューポートで観測すると、30秒時点で b3dm 47件・約27 MiBを受信し、なお5件取得中だった。
-      親から順に読み、視点距離に応じて許容誤差を変えたローカル公開用ビルドでは、同条件で5秒時点に b3dm 13件・glb 18件、合計約15 MiBの取得が終了した。
-      1280×800 でも15秒時点までに b3dm 27件・glb 18件、合計約17 MiBで取得が終了した。
-      同一ブラウザで再訪すると Cache Storage から読み、建物タイルの HTTP 応答は0件だった。
-      前後は同一ビルド・同一キャッシュ状態を交互に測った厳密なベンチマークではない。
-    applies_when: 東京駅・広域視点で同じ PLATEAU LOD1 配信データを読む場合。ブラウザの保存領域が使える場合は再訪時にも適用。
+      1280×800 のローカル Chromium で、3.5 km・ピッチ70度・16ピクセルの東京駅視点は
+      建物タイル125件・233 MiBを取得し、45秒時点で読み込み中0件だった。
+      同じ視点の再訪では8 MiB超の5件・59.2 MiBを再取得したため、Cache Storage の対象を32 MiB以下へ拡大した。
+      PLATEAU VIEW 4.0/5.0 は 3D Tiles の GPU キャッシュに Infinity を指定している。
+    applies_when: 東京駅の初期視点と同じ画面条件。通信速度、GPU 容量、キャッシュ状態で所要時間は変動する。
 architecture_selection:
   chosen:
     platform: browser
