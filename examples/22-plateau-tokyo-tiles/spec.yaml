@@ -1,0 +1,48 @@
+id: 22-plateau-tokyo-tiles
+request: PLATEAU 配信 API を使い、東京駅周辺だけでなく広域の建物を新しい例として表示したい。
+requirements:
+  - id: wide-area
+    need: 東京23区の建物を複数地域へ移動して表示する
+    unmeasured: 東京都 LOD1 の複合 tileset.json から23区を選び、視点と操作を用意する。
+  - id: geometry
+    need: 配信される実際の建物形状を 3D で描く
+    unmeasured: b3dm 内の Draco 圧縮 glTF を復号し、WebGL2 で建物を描く。
+  - id: stream
+    need: 広域データを一度に取得しない
+    unmeasured: region と geometricError でタイルを選び、表示中のものを優先して読み込む。
+  - id: attribution
+    need: 出典を示す
+    unmeasured: PLATEAU と各自治体のデータを使うことをページに表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/22-plateau-tokyo-tiles/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: []
+  sources:
+    - id: plateau-tokyo-bldg-lod1
+      origin: https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/13-bldg-lod1-latest/tileset.json
+      license: 出典は Project PLATEAU と各自治体。配信データの利用条件に従う。
+  outputs: []
+  preparation:
+    - 複合 tileset.json と東京23区の tileset.json をブラウザで読み、可視タイルの b3dm だけを取得する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2、Fetch
+    language: TypeScript
+    gpu: hardware
+    code: [examples/22-plateau-tokyo-tiles/index.html, examples/22-plateau-tokyo-tiles/main.ts, examples/22-plateau-tokyo-tiles/geo.ts, examples/22-plateau-tokyo-tiles/decode.ts, examples/22-plateau-tokyo-tiles/render.ts, examples/22-plateau-tokyo-tiles/draco_decoder.js, examples/22-plateau-tokyo-tiles/draco_decoder.wasm, examples/22-plateau-tokyo-tiles/DRACO-LICENSE.txt]
+    dependencies: [Google Draco 1.5.9 の復号器のみ]
+    why: 3D Tiles の選択と建物描画を専用コードに絞る。配信データは Draco 圧縮されているため復号器が必要。
+  alternatives:
+    - CesiumJS は汎用 3D Tiles エンジン全体を読み込むため、この例では採用しない
+    - 東京23区の CityGML 全量をブラウザで取得する方式は初期表示が重いため採用しない
+  not_doing: [LOD2, テクスチャ, 建物属性, 多摩・島しょ部, 汎用3D Tilesエンジン]
+verification:
+  checks: []

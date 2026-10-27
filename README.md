@@ -5,7 +5,7 @@
 汎用の地図エンジンは作らず、依頼ごとに描画器そのものを作り直します。平面でだけ見せたい依頼なら、3 次元描画のための処理の大半は最初から要りません。要らない機能を持たないことで、コードの量、メモリ、起動時間、描画負荷を減らします。
 
 - 言語、描画 API、ランタイムは依頼に合わせて選ぶ (Canvas 2D、WebGL2、C + EGL/GLES3、マイコン向けの C など)。
-- 外部ライブラリは使わない。ポリゴンの三角形分割に使う earcut だけを例外とし、`vendor/earcut` に版を固定して置く。
+- 描画エンジンとして外部ライブラリは使わない。ポリゴンの三角形分割には `vendor/earcut`、例22の Draco 圧縮建物データの復号には版を固定したデコーダーを使う。
 - 各例を `spec.yaml` で定義する。要件 (requirements)、評価 (evaluation)、計測 (benchmarks)、データ (datasets)、性能の知見 (performance_knowledge)、構成の選択 (architecture_selection)、検証 (verification) の 7 節からなる。
 - 計測済みの例では要件を測定値の上限や下限 (予算) にし、ハーネスが合否を出す。検証の項目は描画器が ID つきで報告し、1 つでも報告がないか失敗すれば不合格にする。未計測の例はその旨を明記する。
 - 描画器を作るたびに、`ref-repos/` に集めた古今東西の地図エンジン (MapLibre、Cesium、deck.gl、OpenLayers、QGIS、Mapnik、Organic Maps など 48) の解き方を読んで参考にする。
@@ -32,8 +32,9 @@
 | [19-kontur-h3-population](examples/19-kontur-h3-population/REQUEST.md) | Kontur の世界人口を 71,283 個の H3 六角形で塗り分ける | Canvas 2D |
 | [20-ucdp-ged-timeline](examples/20-ucdp-ged-timeline/REQUEST.md) | UCDP GED の出来事を年・暴力の分類ごとに地図で見る | Canvas 2D |
 | [21-mapterhorn-planet-terrain](examples/21-mapterhorn-planet-terrain/REQUEST.md) | 全球は標高タイル、地域の詳細は Mapterhorn PMTiles を Range で読み、3D で見る | WebGL2 |
+| [22-plateau-tokyo-tiles](examples/22-plateau-tokyo-tiles/REQUEST.md) | PLATEAU の 3D Tiles から東京23区の建物を読み、広域を探索する | WebGL2 |
 
-各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10、18～21 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10、18～22 は操作できる新規の例で、性能計測と自動検証は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
 サイトのカードにはブラウザ用の例に加え、デスクトップ用・マイコン用の例へのソースリンクも掲載します。
 Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 
@@ -111,4 +112,4 @@ tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて 
 
 ## ライセンス
 
-GPL-3.0-or-later です ([LICENSE](LICENSE))。`ref-repos/` の GPL のエンジン (QGIS、ortho-earth など) の解き方を取り入れるためです。`vendor/earcut` は earcut の ISC ライセンスのままです。`ref-repos/` の中身はこのリポジトリに含めず、`ref-repos/clone.sh` で取得します。それぞれのライセンスは各リポジトリのファイルに従います。
+GPL-3.0-or-later です ([LICENSE](LICENSE))。`ref-repos/` の GPL のエンジン (QGIS、ortho-earth など) の解き方を取り入れるためです。`vendor/earcut` は earcut の ISC ライセンス、例22の Draco デコーダーは [Apache License 2.0](examples/22-plateau-tokyo-tiles/DRACO-LICENSE.txt) のままです。`ref-repos/` の中身はこのリポジトリに含めず、`ref-repos/clone.sh` で取得します。それぞれのライセンスは各リポジトリのファイルに従います。
