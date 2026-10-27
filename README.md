@@ -53,13 +53,14 @@ Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で
 | 04-osm-node-density | WebGL2 | 2730 B gzip | 17135 KB gzip | 275 ms | 2.34 ms | 全部通過 5/5 |
 | 05-tokyo-roads-native | EGL + OpenGL ES 3.0 | 23 KB (実行ファイル) | 5357 KB gzip | 116 ms | 1.14 ms | 全部通過 5/5 |
 | 06-mcu-roadmap | C (MCU) | 988 B (.text) | 469 KB (.rodata) | - | 0.372 ms | 全部通過 6/6 |
-| 07-world-cities-hover | WebGL2 | 4220 B gzip | 129 KB gzip | 63.7 ms | 2.48 ms | 全部通過 7/7 |
+| 07-world-cities-hover | WebGL2 | 4460 B gzip | 142 KB gzip | 63.4 ms | 2.50 ms | 全部通過 7/7 |
 
 - フレームの列は、WebGL2 とネイティブでは GPU の処理が終わるまで待った 1 フレームの時間です。01 はホバー中の rAF フレーム間隔、06 はホスト CPU での時間で、マイコン実機の時間ではありません。
 - 01 と 02 はスマホ相当 (390×844、DPR 3、CPU 4 倍スロットル) で測っています。
 - 配るコードは、TypeScript から型を除いた JavaScript (ブラウザが受け取るもの) の gzip 後の大きさです。
 - 初回描画には、計測用のコードの読み込みを含めていません。
 - この表のほかに、各例の検証の項目 (verification) もすべての反復で通っています。
+- 07 だけ 2026-10-27 に国境線を足して測り直しました (load average 3)。
 
 ### 汎用エンジンとの比較
 
@@ -107,7 +108,7 @@ tools/deploy-pages.sh  # サイトを組み立て、全ページを確かめて 
 
 ## データの出典
 
-- Natural Earth 10m (Admin 0 国、Admin 1 都道府県) v5.1.1。パブリックドメイン。
+- Natural Earth 10m (Admin 0 国、Admin 1 都道府県) v5.1.1、Admin 0 boundary lines (land) v5.1.0。パブリックドメイン。
 - USGS ComCat、2025 年 M4.5 以上。パブリックドメイン。
 - OpenStreetMap、東京 23 区、2026-08-31 時点。© OpenStreetMap contributors、ODbL。
 

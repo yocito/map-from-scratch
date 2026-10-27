@@ -15,7 +15,8 @@ export async function run(map: CityMap, tip: HTMLElement, mounted: number): Prom
   map.draw();
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
   emit({ metric: 'first_frame_ms', value: mounted + performance.now() - t });
-  emit({ info: { gpu: glRenderer(gl), cities: n, land_vertices: map.landVertices, fan_triangles: map.fanTriangles, canvas: [W, H] } });
+  emit({ info: { gpu: glRenderer(gl), cities: n, land_vertices: map.landVertices, fan_triangles: map.fanTriangles,
+    border_vertices: map.borderVertices, border_segments: map.borderSegments, canvas: [W, H] } });
 
   const world = (lon: number, lat: number): [number, number] => {
     const [x, y] = equalEarth([lon, lat]);
@@ -108,6 +109,19 @@ export async function run(map: CityMap, tip: HTMLElement, mounted: number): Prom
   set(0.5, 0.5, 1);
   move(...screen(...world(-140, -5)));
   emit({ check: 'pacific-no-tooltip', pass: tip.textContent === '', detail: tip.textContent });
+
+  // 3. A country border is drawn. The US-Canada border runs straight along
+  //    the 49th parallel at 110°W, far from any city. At 8x, look for a
+  //    dark line pixel in a small window: land and sea are both above 200
+  //    in every channel, the border is around 120.
+  const [bwx, bwy] = world(-110, 49);
+  set(bwx, bwy, 8);
+  map.draw();
+  const bw = 33, bh = 33, bpx = new Uint8Array(bw * bh * 4);
+  gl.readPixels(Math.floor((W - bw) / 2), Math.floor((H - bh) / 2), bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, bpx);
+  let dark = 0;
+  for (let i = 0; i < bpx.length; i += 4) if (bpx[i] < 190 && bpx[i + 1] < 190 && bpx[i + 2] < 190) dark++;
+  emit({ check: 'us-canada-border-drawn', pass: dark > 0, detail: `${dark} dark pixels at 49N 110W` });
 
   // Leave Tokyo hovered over East Asia for the screenshot.
   set(tx, ty, 4);

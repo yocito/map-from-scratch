@@ -69,12 +69,18 @@ datasets:
     - id: ne-countries
       origin: Natural Earth 10m Admin 0 countries v5.1.1 (陸と国名)
       license: Public domain
+    - id: ne-boundary-lines
+      origin: Natural Earth 10m Admin 0 boundary lines (land) v5.1.0 (国境線)
+      license: Public domain
   outputs:
     - data/baked/07-world-cities-hover/land.bin
+    - data/baked/07-world-cities-hover/borders.bin
     - data/baked/07-world-cities-hover/cities.bin
     - data/baked/07-world-cities-hover/names.bin
   preparation:
     - 国を ogr2ogr (ST_Union) で 1 つの陸に溶かしてから Equal Earth で投影・単純化し、リングの頂点と頂点数だけを持つ
+    - 国境は Natural Earth の land boundary lines (海岸線を含まない国境だけ) を使い、陸と二重に配らない
+    - 国境は接合点ごとに 2 点程度の線分に切れているので、端点でつないでから単純化し、鎖を最寄りの端点へたどる順に並べ替える
     - 都市は大きい点から先、同じ半径の中は Morton 順に並べる (描画順と gzip のため)
     - 半径は √人口に比例させ、0.1 px 単位の 1 バイトにする
     - 名前は UTF-16LE のテキスト 1 本 (国名、空行、都市名)
@@ -83,7 +89,7 @@ performance_knowledge:
   - id: dissolve-land
     finding: 国を 1 つの陸に溶かすと、共有境界を 2 回配らずに済む
     evidence: 陸のデータ 62 KB → 43 KB
-    applies_when: 国境を描かず陸の形だけが要るとき
+    applies_when: 陸の形だけを配り、国境は別の線データで描くとき
   - id: stencil-even-odd
     finding: 三角形分割せず、リングごとの扇をステンシル INVERT で偶奇塗りすれば、インデックスを配らずに済み、穴も抜ける
     evidence: 陸のデータ 88 KB → 43 KB (gzip)
@@ -96,22 +102,30 @@ performance_knowledge:
     finding: 7,342 件なら、当たり判定は CPU の総当たりで足りる
     evidence: hover_ms p95 0.25〜0.3 ms
     applies_when: 点が 1 万件程度まで
+  - id: join-noded-boundaries
+    finding: Natural Earth の国境線は接合点ごとに切られているので、端点でつないでから単純化する。大半を占める 2 点だけの線分は単純化しても 1 頂点も減らない
+    evidence: 7,980 本・16,934 頂点・gzip 41.1 KB → 881 本・4,842 頂点・15.0 KB (同じ 1.5 px@4 倍の許容誤差)
+    applies_when: 国境や道路など、接合点で切られた線のネットワークを配るとき
+  - id: order-chains-nearest
+    finding: 鎖を最寄りの端点へたどる順に並べ替えると、鎖の切れ目の差分が小さくなり gzip が縮む
+    evidence: 国境の gzip 15,022 B → 14,508 B (3.4%)
+    applies_when: 差分符号化した線を gzip で配るとき
 
 architecture_selection:
   chosen:
     platform: browser
-    api: WebGL2 (ステンシル)
+    api: WebGL2 (ステンシル、GL_LINES)
     language: TypeScript (ES modules、ビルドなし。配るときは型を外すだけ)
     gpu: hardware
     code: [examples/07-world-cities-hover/index.html, examples/07-world-cities-hover/main.ts, examples/07-world-cities-hover/cities.ts]
     dependencies: []
-    why: 7,342 個の円と陸を、ズームしても滑らかに描くために GPU で描く。依頼が「ページ全体」なので index.html もコードに数え、計測用コードは bench.ts に分けた
+    why: 7,342 個の円、陸、国境線を、ズームしても滑らかに描くために GPU で描く。依頼が「ページ全体」なので index.html もコードに数え、計測用コードは bench.ts に分けた
   alternatives:
     - option: Canvas 2D
       rejected_because: 比べていない
     - option: GPU の ID 描画による当たり判定 (02 の方式)
       rejected_because: 総当たりで p95 0.3 ms なので要らない
-  not_doing: [地図上の文字, 国境, タイル, 回転, 3D, 実行時の投影計算, タッチ操作, クリックでの選択, 検索]
+  not_doing: [地図上の文字, タイル, 回転, 3D, 実行時の投影計算, タッチ操作, クリックでの選択, 検索]
 
 verification:
   checks:
@@ -139,6 +153,10 @@ verification:
       what: 太平洋の上ではツールチップが空
       how: 世界全体の表示で太平洋の位置へ pointermove を送る
       expected: 空文字列
+    - id: us-canada-border-drawn
+      what: 国境線が描かれている (米国とカナダの 49 度線、110°W)
+      how: その点を 8 倍で画面中央に置き、中央 33×33 装置ピクセルに陸 (222,219,209) や海 (204,224,237) より暗いピクセルがあるかを見る
+      expected: 1 ピクセル以上
   harness:
     - webglcontextlost が起きたらエラーにする
     - info.gpu がソフトウェア描画ならエラーにする

@@ -17,6 +17,10 @@ const LAND_FS = `#version 300 es
 precision mediump float;
 out vec4 o;
 void main() { o = vec4(0.87, 0.86, 0.82, 1.0); }`;
+const BORDER_FS = `#version 300 es
+precision mediump float;
+out vec4 o;
+void main() { o = vec4(0.47, 0.46, 0.43, 1.0); }`;
 const CITY_VS = `#version 300 es
 layout(location=0) in vec2 a_pos;
 layout(location=1) in float a_r;   // radius * 10, CSS px
@@ -46,7 +50,7 @@ export interface City { name: string; country: string; population: number }
 export type CityMap = Awaited<ReturnType<typeof mount>>;
 
 export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (c: City | null) => void) {
-  const [land, cbin, nbin] = await Promise.all(['land.bin', 'cities.bin', 'names.bin']
+  const [land, borders, cbin, nbin] = await Promise.all(['land.bin', 'borders.bin', 'cities.bin', 'names.bin']
     .map((f) => fetch(`${base}/${f}`).then((r) => r.arrayBuffer())));
   const ctx = canvas.getContext('webgl2', { antialias: true, alpha: false, stencil: true });
   if (!ctx) throw new Error('WebGL2 is not available');
@@ -66,7 +70,7 @@ export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (
     const u = (n: string) => gl.getUniformLocation(p, n);
     return { p, cam: u('u_cam'), vp: u('u_vp'), px: u('u_px'), hl: u('u_hl') };
   };
-  const landP = program(LAND_VS, LAND_FS), cityP = program(CITY_VS, CITY_FS);
+  const landP = program(LAND_VS, LAND_FS), borderP = program(LAND_VS, BORDER_FS), cityP = program(CITY_VS, CITY_FS);
 
   // Undo the delta coding (see bake.ts). Positions stay 16-bit for the GPU;
   // the CPU keeps world units for the hit test.
@@ -93,6 +97,25 @@ export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.UNSIGNED_SHORT, true, 0, 0);
   buffer(gl.ELEMENT_ARRAY_BUFFER, fan);
+
+  // Borders: chains of vertices unfurled into segment pairs for GL_LINES.
+  const [bv, bl] = new Uint32Array(borders, 0, 2);
+  const blens = new Uint16Array(borders, 8 + 4 * bv, bl);
+  const bpos = undelta(new Uint16Array(borders, 8, 2 * bv), bv);
+  const seg = new Uint16Array(4 * (bv - bl));
+  for (let r = 0, s = 0, k = 0; r < bl; s += blens[r++]) {
+    for (let j = 1; j < blens[r]; j++, k += 4) {
+      seg[k] = bpos[2 * (s + j - 1)];
+      seg[k + 1] = bpos[2 * (s + j - 1) + 1];
+      seg[k + 2] = bpos[2 * (s + j)];
+      seg[k + 3] = bpos[2 * (s + j) + 1];
+    }
+  }
+  const borderVao = gl.createVertexArray();
+  gl.bindVertexArray(borderVao);
+  buffer(gl.ARRAY_BUFFER, seg);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.UNSIGNED_SHORT, true, 0, 0);
 
   // Cities.
   const n = new Uint32Array(cbin, 0, 1)[0];
@@ -121,7 +144,7 @@ export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (
     gl.clearColor(0.8, 0.88, 0.93, 1);
     gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-    for (const { p, cam: c, vp } of [landP, cityP]) {
+    for (const { p, cam: c, vp } of [landP, borderP, cityP]) {
       gl.useProgram(p);
       gl.uniform3f(c, cam.x, cam.y, scale());
       gl.uniform2f(vp, W(), H());
@@ -140,6 +163,11 @@ export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (
     gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
     gl.drawElements(gl.TRIANGLES, fan.length, gl.UNSIGNED_SHORT, 0);
     gl.disable(gl.STENCIL_TEST);
+    // Borders over the land fill. GL_LINES is one device pixel wide; the
+    // context's multisampling anti-aliases it.
+    gl.useProgram(borderP.p);
+    gl.bindVertexArray(borderVao);
+    gl.drawArrays(gl.LINES, 0, seg.length / 2);
     // Cities, then the hovered one again on top.
     gl.useProgram(cityP.p);
     gl.uniform1f(cityP.px, devicePixelRatio);
@@ -218,5 +246,6 @@ export async function mount(canvas: HTMLCanvasElement, base: string, onHover?: (
     draw();
   }).observe(canvas);
 
-  return { gl, cam, draw, pick, setHover, city, n, pos, rad, landVertices: lv, fanTriangles: fan.length / 3 };
+  return { gl, cam, draw, pick, setHover, city, n, pos, rad, landVertices: lv, fanTriangles: fan.length / 3,
+    borderVertices: bv, borderSegments: seg.length / 4 };
 }

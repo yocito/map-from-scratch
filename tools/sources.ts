@@ -34,6 +34,13 @@ const SOURCES: Record<string, Source> = {
     remote: '/vsizip//vsicurl/https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip',
     ogr: ['-select', 'ADM0_A3,NAME,NAME_JA,POP_EST,CONTINENT'],
   },
+  // Natural Earth 10m admin 0 land boundary lines, v5.1.0. Public domain.
+  'ne-boundary-lines': {
+    out: 'ne_10m_admin_0_boundary_lines_land.geojson',
+    local: `${NE}/ne_10m_admin_0_boundary_lines_land.shp`,
+    remote: '/vsizip//vsicurl/https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_boundary_lines_land.zip',
+    ogr: ['-select', 'FEATURECLA'],
+  },
   // Natural Earth 10m admin 1, Japan only (47 prefectures). Public domain.
   'ne-japan-prefectures': {
     out: 'ne_10m_japan_prefectures.geojson',
