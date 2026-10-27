@@ -1,0 +1,47 @@
+id: 21-mapterhorn-planet-terrain
+request: planet.pmtiles を Range で読み、地球全体から地域へ近づいて標高を専用レンダラーで 3D 表示したい。
+requirements:
+  - id: range
+    need: 巨大な PMTiles を全量取得せず、表示に必要な索引と標高タイルを HTTP Range で読む
+    unmeasured: 各通信で Range を指定し、HTTP 206 と長さを確認する。通信回数と取得量を画面に示す。
+  - id: terrain
+    need: 全球の標高を WebGL2 で 3D の地形として描く
+    unmeasured: Terrarium 標高を球面メッシュと陰影に使う。標高による色分けを表示する。
+  - id: navigation
+    need: 全球から山岳地域へ移動し、斜めから地形を見る
+    unmeasured: ズーム、ドラッグ、傾斜、高さの強調と地域プリセットを用意する。
+  - id: attribution
+    need: 標高データの出典を表示する
+    unmeasured: Mapterhorn と日本の国土地理院データの帰属を表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/21-mapterhorn-planet-terrain/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: []
+  sources:
+    - id: mapterhorn-planet
+      origin: https://z.yuiseki.net/static/mapterhorn/2026-01-06/planet.pmtiles
+      license: Mapterhorn の帰属表示に従う。日本の標高には国土地理院 基盤地図情報（数値標高モデル）を含む。
+  outputs: []
+  preparation:
+    - ブラウザで PMTiles v3 の索引を読み、現在表示する WebP Terrarium タイルだけを Range で取得する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2、Fetch Range、DecompressionStream
+    language: TypeScript
+    gpu: hardware
+    code: [examples/21-mapterhorn-planet-terrain/index.html, examples/21-mapterhorn-planet-terrain/main.ts, examples/21-mapterhorn-planet-terrain/gl.ts, examples/21-mapterhorn-planet-terrain/pmtiles.ts]
+    dependencies: []
+    why: 全球から地域への切替に必要なタイルだけを取得し、球面と起伏を専用シェーダーで描く
+  alternatives:
+    - MapLibre GL JS の terrain プラグインは専用レンダラーという依頼に合わないため採用しない
+  not_doing: [衛星写真の重ね合わせ, 極点周辺の標高, 一般的な地図エンジン]
+verification:
+  checks: []
