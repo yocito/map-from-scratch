@@ -94,7 +94,6 @@ function choose(tile: Tile, budget: { count: number }, frame: View): { ready: bo
   if (!visible(tile.box, frame)) return { ready: true, meshes: [] };
   if (budget.count >= 240) return { ready: false, meshes: [] };
   budget.count++;
-  enqueue(tile);
   const distance = Math.max(1, Math.hypot(tile.box.center[0] - frame.eye[0], tile.box.center[1] - frame.eye[1], tile.box.center[2] - frame.eye[2]) - tile.box.radius);
   const errorPixels = tile.error * Math.max(1, canvas.clientHeight) / (2 * Math.tan(Math.PI / 6) * distance);
   if (tile.children.length && (!tile.url || errorPixels > 5) && budget.count < 240) {
@@ -102,9 +101,10 @@ function choose(tile: Tile, budget: { count: number }, frame: View): { ready: bo
       .sort((a, b) => Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y) - Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y))
       .map(child => choose(child, budget, frame));
     if (children.length && children.every(child => child.ready)) return { ready: true, meshes: children.flatMap(child => child.meshes) };
-    if (!tile.mesh) return { ready: false, meshes: children.flatMap(child => child.meshes) };
+    if (!tile.mesh) { enqueue(tile); return { ready: false, meshes: children.flatMap(child => child.meshes) }; }
   }
   if (tile.mesh) { tile.lastUse = performance.now(); return { ready: true, meshes: [tile.mesh] }; }
+  enqueue(tile);
   return { ready: false, meshes: [] };
 }
 function draw() {
