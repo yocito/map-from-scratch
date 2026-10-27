@@ -1,0 +1,47 @@
+id: 24-osm-planet
+request: z.yuiseki.net の OpenStreetMap 全球 PMTiles を、特定レイヤーだけに特化した簡易スタイルで高速に表示したい。
+requirements:
+  - id: planet
+    need: OpenStreetMap の全球 PMTiles を表示する
+    unmeasured: PMTiles v3 の索引と表示中の MVT タイルだけを HTTP Range で読む。
+  - id: specialized
+    need: 特定のレイヤーだけに特化して速く描く
+    unmeasured: water、transportation、place だけを復号し、Canvas 2D の固定スタイルで描く。
+  - id: safe-range
+    need: Range 要求で 200 OK が混じっても巨大ファイルを全量取得しない
+    unmeasured: HTTP 200 の本文を直ちにキャンセルし、最大4回まで Range を再試行する。
+  - id: attribution
+    need: データの出典を示す
+    unmeasured: OpenStreetMap と OpenMapTiles への帰属リンクを表示する。
+evaluation:
+  budgets: []
+benchmarks:
+  runtime: browser
+  page: examples/24-osm-planet/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  iterations: 1
+  scenarios: []
+datasets:
+  bake: []
+  sources:
+    - id: osm-planet-pmtiles
+      origin: https://z.yuiseki.net/static/openstreetmap/planet/planet.pmtiles
+      license: OpenStreetMap contributors と OpenMapTiles への帰属を画面に表示する。
+  outputs: []
+  preparation:
+    - 約83 GB のアーカイブから先頭索引、必要な葉索引、表示中の gzip MVT だけを Range 取得する
+performance_knowledge: []
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D、Fetch、DecompressionStream
+    language: TypeScript
+    gpu: none
+    code: [examples/24-osm-planet/index.html, examples/24-osm-planet/main.ts, examples/24-osm-planet/pmtiles.ts, examples/24-osm-planet/mvt.ts, examples/24-osm-planet/style.ts]
+    dependencies: []
+    why: 水域・道路・地名だけに対象を絞り、汎用スタイルエンジンと他の13レイヤーの形状復号を省く。
+  alternatives:
+    - MapLibre GL JS と PMTiles プラグインは、この例では汎用機能が多いため採用しない
+  not_doing: [建物, 土地利用, 公園, POI, 道路名, 3D, 汎用スタイル式]
+verification:
+  checks: []

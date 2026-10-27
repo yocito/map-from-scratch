@@ -35,8 +35,9 @@
 | [21-mapterhorn-planet-terrain](examples/21-mapterhorn-planet-terrain/REQUEST.md) | 全球は標高タイル、地域の詳細は Mapterhorn PMTiles を Range で読み、3D で見る | WebGL2 |
 | [22-plateau-tokyo-tiles](examples/22-plateau-tokyo-tiles/REQUEST.md) | PLATEAU の 3D Tiles から東京23区の建物を読み、広域を探索する | WebGL2 |
 | [23-taito-point-cloud](examples/23-taito-point-cloud/REQUEST.md) | GSJ の点群 PNG タイルから台東区の地形・建物を 3D の点群で見る | WebGL2 |
+| [24-osm-planet](examples/24-osm-planet/REQUEST.md) | OpenStreetMap 全球 PMTiles の水域・道路・地名だけを簡易表示する | Canvas 2D |
 
-各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10、18～23 は操作できる新規の例で、性能計測は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
+各例の定義は `spec.yaml` に、設計と計測で分かったことの説明は `REQUEST.md` にあります。08～10、18～24 は操作できる新規の例で、性能計測は未実施です。07 は、スキル (SKILL.md) だけを読んだエージェントが作った例で、スキルの検証を兼ねています。
 サイトのカードにはブラウザ用の例に加え、デスクトップ用・マイコン用の例へのソースリンクも掲載します。
 Pages に掲載できない例は `spec.yaml` の `publication.pages: false` で指定し、サイト生成時にページとデータを除外します。
 
