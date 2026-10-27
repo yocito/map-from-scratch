@@ -6,10 +6,10 @@ requirements:
     unmeasured: 東京都 LOD1 の複合 tileset.json から23区を選び、視点と操作を用意する。
   - id: geometry
     need: 配信される実際の建物形状を 3D で描く
-    unmeasured: b3dm 内の Draco 圧縮 glTF を復号し、WebGL2 で建物を描く。
+    unmeasured: b3dm と直接 glb 内の Draco 圧縮 glTF を復号し、Y-up を Z-up に変換して WebGL2 で描く。
   - id: stream
     need: 広域データを一度に取得しない
-    unmeasured: region と geometricError でタイルを選び、表示中のものを優先して読み込む。
+    unmeasured: region、視錐台、geometricError でタイルを選び、表示中のものを優先して読み込む。
   - id: attribution
     need: 出典を示す
     unmeasured: PLATEAU と各自治体のデータを使うことをページに表示する。
@@ -29,7 +29,7 @@ datasets:
       license: 出典は Project PLATEAU と各自治体。配信データの利用条件に従う。
   outputs: []
   preparation:
-    - 複合 tileset.json と東京23区の tileset.json をブラウザで読み、可視タイルの b3dm だけを取得する
+    - 複合 tileset.json と東京23区の tileset.json をブラウザで読み、可視タイルの b3dm または glb だけを取得する
 performance_knowledge: []
 architecture_selection:
   chosen:

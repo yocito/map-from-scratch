@@ -8,12 +8,14 @@ function dracoModule(): Promise<any> {
   return decoderPromise ??= window.DracoDecoderModule({ locateFile: () => './draco_decoder.wasm' });
 }
 
-export async function decodeB3dm(bytes: ArrayBuffer): Promise<Geometry[]> {
+export async function decodeTile(bytes: ArrayBuffer): Promise<Geometry[]> {
   const data = new DataView(bytes);
-  if (data.getUint32(0, true) !== 0x6d643362 || data.getUint32(4, true) !== 1) throw new Error('b3dm v1 ではありません');
-  if (data.getUint32(8, true) !== bytes.byteLength) throw new Error('b3dm の長さが一致しません');
-  const glbStart = 28 + data.getUint32(12, true) + data.getUint32(16, true) + data.getUint32(20, true) + data.getUint32(24, true);
-  if (data.getUint32(glbStart, true) !== 0x46546c67) throw new Error('b3dm に GLB がありません');
+  let glbStart = 0;
+  if (data.getUint32(0, true) === 0x6d643362) {
+    if (data.getUint32(4, true) !== 1 || data.getUint32(8, true) !== bytes.byteLength) throw new Error('b3dm v1 のヘッダーが不正です');
+    glbStart = 28 + data.getUint32(12, true) + data.getUint32(16, true) + data.getUint32(20, true) + data.getUint32(24, true);
+  }
+  if (data.getUint32(glbStart, true) !== 0x46546c67 || data.getUint32(glbStart + 4, true) !== 2) throw new Error('GLB v2 ではありません');
   const jsonLength = data.getUint32(glbStart + 12, true);
   const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes, glbStart + 20, jsonLength)));
   const binHeader = glbStart + 20 + jsonLength;
@@ -24,7 +26,7 @@ export async function decodeB3dm(bytes: ArrayBuffer): Promise<Geometry[]> {
   const decoder = new draco.Decoder();
   const parts: Geometry[] = [];
   try {
-    for (const mesh of gltf.meshes ?? []) for (const primitive of mesh.primitives ?? []) {
+    for (const [meshIndex, mesh] of (gltf.meshes ?? []).entries()) for (const primitive of mesh.primitives ?? []) {
       const ext = primitive.extensions?.KHR_draco_mesh_compression;
       if (!ext || (primitive.mode ?? 4) !== 4) continue;
       const view = gltf.bufferViews[ext.bufferView];
@@ -50,11 +52,16 @@ export async function decodeB3dm(bytes: ArrayBuffer): Promise<Geometry[]> {
       };
       const xyz = attribute(ext.attributes.POSITION);
       const nrm = attribute(ext.attributes.NORMAL, true);
+      const instance = (gltf.nodes ?? []).find((n: any) => n.mesh === meshIndex);
+      if (instance?.matrix || instance?.rotation || instance?.scale) throw new Error('未対応の glTF ノード変換です');
+      const translation: number[] = instance?.translation ?? [0, 0, 0];
       const positions = new Float32Array(count * 3), normals = new Float32Array(count * 3);
       for (let i = 0; i < count; i++) {
         const k = 3 * i;
-        const p = local(rtc[0] + xyz[k], rtc[1] + xyz[k + 1], rtc[2] + xyz[k + 2]);
-        const n = normal(nrm[k], nrm[k + 1], nrm[k + 2]);
+        // 3D Tiles is Z-up, while glTF is Y-up. Apply the node transform
+        // before that axis change, then add CESIUM_RTC in ECEF coordinates.
+        const p = local(rtc[0] + translation[0] + xyz[k], rtc[1] - translation[2] - xyz[k + 2], rtc[2] + translation[1] + xyz[k + 1]);
+        const n = normal(nrm[k], -nrm[k + 2], nrm[k + 1]);
         positions.set(p, k); normals.set(n, k);
       }
       const indices = new Uint32Array(decoded.num_faces() * 3);

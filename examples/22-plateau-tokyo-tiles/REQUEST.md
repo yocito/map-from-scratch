@@ -2,8 +2,10 @@
 
 [PLATEAU 配信サービス](https://docs.plateauview.mlit.go.jp/api/rest/operations/datacatalog3dtilesspectilesetjson/)の東京都 LOD1 建築物の複合 `tileset.json` から東京23区を選び、カメラ周辺の都市 `tileset.json` と `b3dm` タイルだけを読みます。東京駅周辺2 kmに固定された例16より広い範囲を、東京駅・新宿・渋谷・上野・お台場・池袋の視点とマウス操作で探索できます。
 
-描画はこの例専用の WebGL2 シェーダーです。3D Tiles の `region` と `geometricError` を使って表示タイルを選び、細かいタイルが読み込まれるまでは親タイルを描きます。`b3dm` 内の glTF メッシュは、同梱した Google Draco 1.5.9 のデコーダーで復号します。建物の座標を東京駅基準の局所座標へ変換し、頂点と法線を GPU に送ります。Cesium や MapLibre は使いません。
+描画はこの例専用の WebGL2 シェーダーです。3D Tiles の `region` と `geometricError` を使って表示タイルを選び、細かいタイルが読み込まれるまでは親タイルを描きます。多くの区の `b3dm` と台東区の直接 `glb` を読み、同梱した Google Draco 1.5.9 のデコーダーでメッシュを復号します。glTF の Y-up 座標を 3D Tiles の Z-up 座標に直し、東京駅基準の局所座標へ変換して GPU に送ります。Cesium や MapLibre は使いません。
 
 最初の対象は東京23区の LOD1 です。自治体ごとに配信年度が異なり、`latest` は各自治体で最新のものを採用します。LOD2、テクスチャ、建物属性のクリック表示、東京都の多摩・島しょ部はこの例の対象外です。地面の格子は位置の目安として描いたもので、道路や地形データではありません。性能計測と操作の自動検証は未実施です。
+
+現状の読み込みでは、建物タイルの取得と Draco 復号が主な待ち時間になると考えています。復号には WebAssembly を使っています。WebGPU は大量のメッシュをまとめて描く必要が生じた際に比較し、HTML-in-Canvas はラベルや情報パネルを地図面に配置する場合に検討します。現状の情報パネルは通常の HTML です。
 
 データ出典: [Project PLATEAU](https://www.mlit.go.jp/plateau/) と東京都内の各自治体。PLATEAU の配信 API は試験提供中です。Draco デコーダーは Apache License 2.0 で、[ライセンス](DRACO-LICENSE.txt)を同梱しています。

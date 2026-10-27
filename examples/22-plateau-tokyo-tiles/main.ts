@@ -1,7 +1,7 @@
 // Tokyo's 23 wards from PLATEAU's composite 3D Tiles, drawn by our WebGL2
 // renderer. Only the Draco codec is vendored; Cesium is not involved.
 import { at, regionSphere, type Region } from './geo.ts';
-import { decodeB3dm } from './decode.ts';
+import { decodeTile } from './decode.ts';
 import { cameraEye, createRenderer, type Mesh, type Camera } from './render.ts';
 
 const SOURCE = 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/13-bldg-lod1-latest/tileset.json';
@@ -9,8 +9,9 @@ const canvas = document.getElementById('map') as HTMLCanvasElement;
 const status = document.getElementById('status')!;
 const scale = document.getElementById('scale')!;
 const renderer = createRenderer(canvas);
-const camera: Camera = { x: 0, y: 0, distance: 25000, yaw: 0, pitch: 56, width: 1, height: 1 };
+const camera: Camera = { x: 0, y: 0, distance: 7000, yaw: 0, pitch: 56, width: 1, height: 1 };
 interface Box { center: [number, number, number]; radius: number }
+interface View { eye: [number, number, number]; forward: [number, number, number]; right: [number, number, number]; up: [number, number, number]; tanX: number; tanY: number }
 interface Tile { box: Box; error: number; depth: number; url: string | null; children: Tile[]; mesh: Mesh | null; loading: boolean; failed: boolean; lastUse: number }
 interface City { url: string; box: Box; root: Tile | null; loading: boolean; failed: boolean }
 let cities: City[] = [], scheduled = false, pending = 0, cityPending = 0, gpuBytes = 0, received = 0, requests = 0, lastError = '';
@@ -29,9 +30,21 @@ function schedule() {
   scheduled = true;
   requestAnimationFrame(() => { scheduled = false; draw(); });
 }
-function near(box: Box): boolean {
+function view(): View {
+  const yaw = camera.yaw * Math.PI / 180, pitch = camera.pitch * Math.PI / 180;
+  const h = Math.cos(pitch), v = Math.sin(pitch), tanY = Math.tan(Math.PI / 6);
+  return { eye: cameraEye(camera), forward: [-Math.sin(yaw) * h, Math.cos(yaw) * h, -v],
+    right: [Math.cos(yaw), Math.sin(yaw), 0], up: [-Math.sin(yaw) * v, Math.cos(yaw) * v, h],
+    tanX: tanY * Math.max(1, canvas.clientWidth) / Math.max(1, canvas.clientHeight), tanY };
+}
+function visible(box: Box, frame: View): boolean {
   const dx = box.center[0] - camera.x, dy = box.center[1] - camera.y;
-  return Math.hypot(dx, dy) < box.radius + camera.distance * 1.4;
+  if (Math.hypot(dx, dy) > box.radius + camera.distance * 1.8) return false;
+  const d = [box.center[0] - frame.eye[0], box.center[1] - frame.eye[1], box.center[2] - frame.eye[2]];
+  const dot = (axis: [number, number, number]) => d[0] * axis[0] + d[1] * axis[1] + d[2] * axis[2];
+  const depth = dot(frame.forward);
+  return depth + box.radius > 0 && Math.abs(dot(frame.right)) <= Math.max(0, depth) * frame.tanX + box.radius * 1.5
+    && Math.abs(dot(frame.up)) <= Math.max(0, depth) * frame.tanY + box.radius * 1.5;
 }
 function requestCity(city: City) {
   if (city.root || city.loading || city.failed) return;
@@ -56,9 +69,8 @@ function enqueue(tile: Tile) {
 }
 function pumpTiles() {
   const targets = [...queue].sort((a, b) => {
-    const da = Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y);
-    const db = Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y);
-    return a.depth - b.depth || da - db;
+    const score = (tile: Tile) => Math.hypot(tile.box.center[0] - camera.x, tile.box.center[1] - camera.y) / (tile.box.radius + 500) + tile.depth * 0.02;
+    return score(a) - score(b);
   });
   queue.clear();
   for (const tile of targets) {
@@ -69,7 +81,7 @@ function pumpTiles() {
       if (!response.ok) throw new Error(`建物タイル: HTTP ${response.status}`);
       const bytes = await response.arrayBuffer();
       received += bytes.byteLength; requests++;
-      return decodeB3dm(bytes);
+      return decodeTile(bytes);
     }).then(geometry => {
       tile.mesh = renderer.upload(geometry);
       gpuBytes += tile.mesh.bytes;
@@ -78,15 +90,17 @@ function pumpTiles() {
       .finally(() => { tile.loading = false; pending--; schedule(); });
   }
 }
-function choose(tile: Tile, budget: { count: number }, eye: [number, number, number]): { ready: boolean; meshes: Mesh[] } {
-  if (!near(tile.box)) return { ready: true, meshes: [] };
-  if (budget.count >= 90) return { ready: false, meshes: [] };
+function choose(tile: Tile, budget: { count: number }, frame: View): { ready: boolean; meshes: Mesh[] } {
+  if (!visible(tile.box, frame)) return { ready: true, meshes: [] };
+  if (budget.count >= 240) return { ready: false, meshes: [] };
   budget.count++;
   enqueue(tile);
-  const distance = Math.max(1, Math.hypot(tile.box.center[0] - eye[0], tile.box.center[1] - eye[1], tile.box.center[2] - eye[2]) - tile.box.radius);
+  const distance = Math.max(1, Math.hypot(tile.box.center[0] - frame.eye[0], tile.box.center[1] - frame.eye[1], tile.box.center[2] - frame.eye[2]) - tile.box.radius);
   const errorPixels = tile.error * Math.max(1, canvas.clientHeight) / (2 * Math.tan(Math.PI / 6) * distance);
-  if (tile.children.length && errorPixels > 30 && budget.count < 90) {
-    const children = tile.children.filter(child => near(child.box)).map(child => choose(child, budget, eye));
+  if (tile.children.length && (!tile.url || errorPixels > 5) && budget.count < 240) {
+    const children = tile.children.filter(child => visible(child.box, frame))
+      .sort((a, b) => Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y) - Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y))
+      .map(child => choose(child, budget, frame));
     if (children.length && children.every(child => child.ready)) return { ready: true, meshes: children.flatMap(child => child.meshes) };
     if (!tile.mesh) return { ready: false, meshes: children.flatMap(child => child.meshes) };
   }
@@ -95,15 +109,15 @@ function choose(tile: Tile, budget: { count: number }, eye: [number, number, num
 }
 function draw() {
   camera.width = canvas.clientWidth; camera.height = canvas.clientHeight;
-  const nearby = cities.filter(city => near(city.box)).sort((a, b) => {
+  const frame = view();
+  const nearby = cities.filter(city => visible(city.box, frame)).sort((a, b) => {
     const da = Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y);
     const db = Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y);
     return da - db;
-  }).slice(0, camera.distance > 35000 ? 23 : 12);
+  }).slice(0, camera.distance > 35000 ? 23 : camera.distance > 10000 ? 12 : camera.distance > 5000 ? 6 : 4);
   for (const city of nearby) requestCity(city);
   pumpCities();
-  const eye = cameraEye(camera);
-  const meshes = nearby.flatMap(city => city.root ? choose(city.root, { count: 0 }, eye).meshes : []);
+  const meshes = nearby.flatMap(city => city.root ? choose(city.root, { count: 0 }, frame).meshes : []);
   pumpTiles();
   renderer.draw(camera, meshes);
   if (gpuBytes > 160 * 1048576) {
@@ -118,14 +132,20 @@ function draw() {
 }
 
 const places: Record<string, [number, number, number]> = {
-  tokyo: [139.76712, 35.68124, 25000], shinjuku: [139.7006, 35.6938, 10500],
-  shibuya: [139.7016, 35.6580, 7500], ueno: [139.7774, 35.7138, 7500],
-  odaiba: [139.7757, 35.6264, 11000], ikebukuro: [139.7109, 35.7289, 9000],
+  tokyo: [139.76712, 35.68124, 7000], shinjuku: [139.7006, 35.6938, 4500],
+  shibuya: [139.7016, 35.6580, 4000], ueno: [139.7774, 35.7138, 3500],
+  odaiba: [139.7757, 35.6264, 5500], ikebukuro: [139.7109, 35.7289, 4500],
 };
-document.querySelectorAll<HTMLButtonElement>('[data-place]').forEach(button => button.addEventListener('click', () => {
-  const place = places[button.dataset.place!];
+function setPlace(name: string) {
+  const place = places[name];
+  if (!place) return;
   [camera.x, camera.y] = at(place[0], place[1]); camera.distance = place[2]; schedule();
+}
+document.querySelectorAll<HTMLButtonElement>('[data-place]').forEach(button => button.addEventListener('click', () => {
+  setPlace(button.dataset.place!);
+  history.replaceState(null, '', `?place=${button.dataset.place}`);
 }));
+setPlace(new URLSearchParams(location.search).get('place') ?? 'tokyo');
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 let drag: { id: number; x: number; y: number; pan: boolean } | null = null;
 canvas.addEventListener('pointerdown', event => { canvas.setPointerCapture(event.pointerId); drag = { id: event.pointerId, x: event.clientX, y: event.clientY, pan: event.button === 2 || event.shiftKey }; });
