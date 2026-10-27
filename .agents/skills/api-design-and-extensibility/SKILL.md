@@ -332,7 +332,7 @@ maplibre-rs
 16. https://github.com/maplibre/maplibre-rs/issues/96
 
 MapLibre Tile (MLT)
-17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md; `ref-repos/yuiseki__maplibre-tile-spec/docs/overview.md`; https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/README.md; `ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/README.md`
+17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md; `ref-repos/maplibre__maplibre-tile-spec/docs/overview.md`; https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/README.md; `ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/README.md`
 18. https://github.com/yuiseki/maplibre-tile-spec/commit/bd720d33; https://github.com/yuiseki/maplibre-tile-spec/commit/3c436932; https://github.com/yuiseki/maplibre-tile-spec/commit/4f30e61d; https://github.com/yuiseki/maplibre-tile-spec/commit/85684b59
 
 navara

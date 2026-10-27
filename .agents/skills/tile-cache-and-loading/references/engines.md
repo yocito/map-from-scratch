@@ -301,7 +301,7 @@ end of this file (numbered independently of SKILL.md).
 23. https://github.com/maplibre/maplibre-native/commit/0344ce36c483dbbcf770ac7f2615a233b22c4452
 24. `ref-repos/maplibre__maplibre-rs/docs/src/development-documents/caching.md`, https://github.com/maplibre/maplibre-rs/blob/main/docs/src/development-documents/caching.md, https://github.com/maplibre/maplibre-rs/commit/7e11f85, https://github.com/maplibre/maplibre-rs/commit/fad6b35, https://github.com/maplibre/maplibre-rs/commit/1f6e31a, https://github.com/maplibre/maplibre-rs/commit/52cc15b, https://github.com/maplibre/maplibre-rs/commit/151ee9f
 25. https://github.com/maplibre/maplibre-rs/blob/main/maplibre/src/render/tile_view_pattern/mod.rs, `ref-repos/maplibre__maplibre-rs/maplibre/src/render/tile_view_pattern/pattern.rs`, https://github.com/maplibre/maplibre-rs/commit/2b917e9, https://github.com/maplibre/maplibre-rs/commit/67109d8, https://github.com/maplibre/maplibre-rs/commit/d8c2844
-26. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, `ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md`
+26. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, `ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md`
 27. https://github.com/yuiseki/maplibre-tile-spec/commit/c9c39700
 28. https://github.com/maplibre/navara/blob/main/guide/MEMORY_MANAGEMENT.md, `ref-repos/maplibre__navara/guide/MEMORY_MANAGEMENT.md`
 29. https://github.com/maplibre/navara/pull/692

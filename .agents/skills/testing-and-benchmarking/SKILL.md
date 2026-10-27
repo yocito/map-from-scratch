@@ -388,8 +388,8 @@ Skip, because the narrow purpose allows it:
 12. https://github.com/maplibre/maplibre-rs/issues/96
 13. https://github.com/maplibre/maplibre-rs/commit/0de294e ; ref-repos/maplibre__maplibre-rs/render-tests/src/templates/results-failed-caseIds.txt
 14. https://github.com/maplibre/maplibre-rs/pull/340
-15. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md
-16. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/implementation-guide.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md
+15. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md
+16. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md ; ref-repos/maplibre__maplibre-tile-spec/docs/implementation-guide.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md ; ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md
 17. https://github.com/yuiseki/maplibre-tile-spec/commit/a8a7d513
 18. https://github.com/yuiseki/maplibre-tile-spec/commit/033374a9 ; https://github.com/yuiseki/maplibre-tile-spec/commit/72c06e10 ; https://github.com/yuiseki/maplibre-tile-spec/commit/65488108 ; https://github.com/yuiseki/maplibre-tile-spec/commit/c9e309e9
 19. https://github.com/maplibre/navara/blob/main/guide/TEXT_BATCHING.md

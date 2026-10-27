@@ -294,7 +294,7 @@ Evidence for pushing width into the shader:
 9. https://github.com/maplibre/maplibre-rs/issues/230
 10. https://github.com/maplibre/maplibre-rs/commit/0de294e
 11. https://github.com/maplibre/maplibre-rs/blob/main/maplibre/src/lib.rs, ref-repos/maplibre__maplibre-rs/docs/src/development-documents/figures/data-model.drawio.svg
-12. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md, ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
+12. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md, ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
 13. https://github.com/maplibre/navara/blob/main/guide/POLYLINE_DASH.md
 14. https://github.com/opengeos/RustGIS/issues/596, https://github.com/opengeos/RustGIS/pull/606, https://github.com/opengeos/RustGIS/pull/611
 15. ref-repos/CesiumGS__cesium/CHANGES.md, https://github.com/CesiumGS/cesium/pull/13675, https://github.com/CesiumGS/cesium/pull/13703

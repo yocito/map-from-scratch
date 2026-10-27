@@ -210,9 +210,9 @@ Local paths are relative to the repository root.
 14. https://github.com/maplibre/maplibre-native/commit/673f9e364804b4c3f449c8619e767a7b40e5350e
 15. https://github.com/maplibre/maplibre-rs/blob/main/maplibre/src/coords.rs ; ref-repos/maplibre__maplibre-rs/maplibre/src/coords.rs ; ref-repos/maplibre__maplibre-rs/maplibre/src/render/tile_view_pattern/pattern.rs ; https://github.com/maplibre/maplibre-rs/commit/d8c2844
 16. https://github.com/maplibre/maplibre-rs/issues/161 ; https://github.com/maplibre/maplibre-rs/pull/273 ; https://github.com/maplibre/maplibre-rs/issues/73
-17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md
-18. https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md ; ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/encodings.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/encodings.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md
-19. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md ; ref-repos/yuiseki__maplibre-tile-spec/docs/overview.md
+17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md ; ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md
+18. https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md ; ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/encodings.md ; ref-repos/maplibre__maplibre-tile-spec/docs/encodings.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md
+19. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md ; ref-repos/maplibre__maplibre-tile-spec/docs/overview.md
 20. https://github.com/yuiseki/maplibre-tile-spec/commit/c5bb4d93 ; https://github.com/yuiseki/maplibre-tile-spec/commit/460df66a ; https://github.com/yuiseki/maplibre-tile-spec/commit/4b6fb76e ; https://github.com/yuiseki/maplibre-tile-spec/commit/774768aa
 21. https://github.com/maplibre/navara/blob/main/guide/RTC_VS_RTE.md ; ref-repos/maplibre__navara/guide/RTC_VS_RTE.md ; https://github.com/maplibre/navara/blob/main/shaders/glsl/chunks/rte_pars_vertex.glsl
 22. https://github.com/maplibre/navara/blob/main/guide/POLYLINE_DASH.md

@@ -60,7 +60,7 @@ reject.
   at merge [25][26]. A port bug in `justify_line` surfaced a week later
   [26]. "text rendering = glyph rendering + text shaping" [25].
 
-## MapLibre Tile (yuiseki/maplibre-tile-spec)
+## MapLibre Tile (maplibre/maplibre-tile-spec)
 
 - One dictionary shared across `name:*` columns: disabling it cost +25.4%
   size on OMT, +0.8% on Protomaps [27]. FSST gave only 0.2-0.8% [27];

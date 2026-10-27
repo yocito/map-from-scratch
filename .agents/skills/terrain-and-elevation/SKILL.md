@@ -361,7 +361,7 @@ Local paths are relative to the repository root.
 18. https://github.com/maplibre/maplibre-native/pull/4190
 19. https://github.com/maplibre/maplibre-native/pull/4280
 20. https://github.com/maplibre/maplibre-native/pull/3965
-21. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md; ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md
+21. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md; ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md
 22. https://github.com/maplibre/navara/blob/main/guide/VECTOR_TILE_DRAPING.md; https://github.com/maplibre/navara/blob/main/guide/TILE_TEXTURE_COMPOSITING.md; ref-repos/maplibre__navara/guide/VECTOR_TILE_DRAPING.md
 23. https://github.com/maplibre/navara/blob/main/guide/TILE_TERRAIN_TRAVERSAL.md; ref-repos/maplibre__navara/guide/TILE_TERRAIN_TRAVERSAL.md
 24. https://github.com/maplibre/navara/pull/474; https://github.com/maplibre/navara/pull/573

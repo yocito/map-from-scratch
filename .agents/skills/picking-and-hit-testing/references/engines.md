@@ -318,7 +318,7 @@ list at the end of this file (its numbering is separate from SKILL.md).
 5. https://github.com/maplibre/maplibre-gl-js/commit/fc992ec59
 6. https://github.com/maplibre/maplibre-native/commit/0051fcdbb85b2a02751c62d1c76ee1518a967bcb
 7. https://github.com/maplibre/maplibre-native/commit/90f6c531f31a4edc5945f15a9864b914ce156ba8
-8. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v1.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md (local: ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v1.md, ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-wasm/README.md)
+8. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v1.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md (local: ref-repos/maplibre__maplibre-tile-spec/docs/specification/v1.md, ref-repos/maplibre__maplibre-tile-spec/rust/mlt-wasm/README.md)
 9. https://github.com/maplibre/navara/blob/main/guide/ARCHITECTURE.md, https://github.com/maplibre/navara/blob/main/guide/TILE_TEXTURE_COMPOSITING.md
 10. https://github.com/maplibre/navara/pull/420
 11. https://github.com/maplibre/navara/pull/133

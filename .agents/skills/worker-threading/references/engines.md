@@ -364,8 +364,8 @@ end of this file (numbered independently of SKILL.md).
 28. https://github.com/maplibre/maplibre-rs/blob/main/docs/src/supported-platforms.md, `ref-repos/maplibre__maplibre-rs/docs/src/development-documents/architecture.md`, `ref-repos/maplibre__maplibre-rs/docs/src/development-documents/library-packaging/web.md`
 29. https://github.com/maplibre/maplibre-rs/issues/45
 30. https://github.com/maplibre/maplibre-rs/commit/7dc7346, https://github.com/maplibre/maplibre-rs/commit/2696d81, https://github.com/maplibre/maplibre-rs/commit/9496ef0, https://github.com/maplibre/maplibre-rs/commit/b7e4c27
-31. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md, `ref-repos/yuiseki__maplibre-tile-spec/docs/implementation-guide.md`
-32. https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md, `ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-wasm/README.md`
+31. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md, `ref-repos/maplibre__maplibre-tile-spec/docs/implementation-guide.md`
+32. https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md, `ref-repos/maplibre__maplibre-tile-spec/rust/mlt-wasm/README.md`
 33. https://github.com/yuiseki/maplibre-tile-spec/commit/9b126a1f, https://github.com/yuiseki/maplibre-tile-spec/commit/65488108, https://github.com/yuiseki/maplibre-tile-spec/commit/e77db675
 34. https://github.com/maplibre/navara/pull/464, https://github.com/maplibre/navara/commit/04a7e1f7, https://github.com/maplibre/navara/commit/d0b0d573
 35. https://github.com/maplibre/navara/commit/268b8aab, https://github.com/maplibre/navara/commit/4af8b7b0, https://github.com/maplibre/navara/commit/6087f0c1

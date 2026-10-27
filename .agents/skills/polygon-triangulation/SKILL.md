@@ -254,8 +254,8 @@ the local clone.
 13. https://github.com/maplibre/maplibre-rs/commit/1b4eada
 14. https://github.com/maplibre/maplibre-rs/commit/635df81; https://github.com/maplibre/maplibre-rs/commit/b30beb8; https://github.com/maplibre/maplibre-rs/commit/37a2953
 15. https://github.com/maplibre/maplibre-rs/commit/e6f3b18
-16. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md; ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md; ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
-17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md; ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md
+16. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md; ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-core/CHANGELOG.md; ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
+17. https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md; ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md
 18. https://github.com/yuiseki/maplibre-tile-spec/commit/a7eac51d; https://github.com/yuiseki/maplibre-tile-spec/commit/85684b59
 19. https://github.com/yuiseki/maplibre-tile-spec/commit/8c8b4d64; https://github.com/yuiseki/maplibre-tile-spec/commit/1cdc94a6
 20. https://github.com/yuiseki/maplibre-tile-spec/commit/211c4124

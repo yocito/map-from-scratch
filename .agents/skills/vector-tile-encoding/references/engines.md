@@ -4,7 +4,7 @@ Detail behind SKILL.md. Numbers in brackets refer to the Sources list at the
 end of [../SKILL.md](../SKILL.md). Read the section for the engine whose
 approach you are about to copy or reject.
 
-## MapLibre Tile (MLT), yuiseki/maplibre-tile-spec
+## MapLibre Tile (MLT), maplibre/maplibre-tile-spec
 
 The most measured source on encoding choices; most numbers come from the
 planet benchmarks (OpenMapTiles and Protomaps schemas) [1].

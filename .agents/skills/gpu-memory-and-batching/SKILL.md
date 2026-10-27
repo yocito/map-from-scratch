@@ -373,7 +373,7 @@ transfer off the main thread in `worker-threading`.
 25. Cesium index type per batch: https://github.com/CesiumGS/cesium/commit/ee98e8aab42cbca4e15ef6d054e8015c266b42d0, https://github.com/CesiumGS/cesium/commit/283e394fd2798043d4166f41eabb1204590327ee
 26. Cesium 16-bit index terrain grids: https://github.com/CesiumGS/cesium/commit/0eafc5417, https://github.com/CesiumGS/cesium/commit/9fc98317e, https://github.com/CesiumGS/cesium/commit/610ad4f2f
 27. Cesium quantised terrain: `ref-repos/CesiumGS__cesium/CHANGES.md`, http://cesiumjs.org/2015/12/18/Terrain-Quantization/
-28. MLT layer-global indices: https://github.com/yuiseki/maplibre-tile-spec/commit/211c4124, https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md, `ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md`
+28. MLT layer-global indices: https://github.com/yuiseki/maplibre-tile-spec/commit/211c4124, https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/specification/v2.md, `ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md`
 29. MLT triangle trees: https://github.com/yuiseki/maplibre-tile-spec/commit/8c8b4d64, https://github.com/yuiseki/maplibre-tile-spec/commit/1cdc94a6, https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md
 30. deck.gl picking ids from instance index: https://github.com/visgl/deck.gl/blob/master/docs/whats-new.md, https://github.com/visgl/deck.gl/blob/master/docs/upgrade-guide.md, https://github.com/visgl/deck.gl/commit/0c4b7d11, https://github.com/visgl/deck.gl/commit/48760d53
 31. deck.gl picking colour cap: https://github.com/visgl/deck.gl/commit/37237d01
@@ -435,9 +435,9 @@ transfer off the main thread in `worker-threading`.
 87. MapLibre GL JS sprites on demand: https://github.com/maplibre/maplibre-gl-js/commit/c8615fae1
 88. MapLibre Native clip IDs: https://github.com/maplibre/maplibre-native/commit/0cd646180
 89. MapLibre Native collision debug buffers: https://github.com/maplibre/maplibre-native/commit/e582a329ef0150616b0d0e1d7c8f44bd31d92f26, https://github.com/maplibre/maplibre-native/commit/c9924ae9d5d6e499267eea3bb9b1092bfd18ddf4
-90. MLT columnar layout: https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, `ref-repos/yuiseki__maplibre-tile-spec/docs/overview.md`, `ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md`
-91. MLT in-memory model: https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md, `ref-repos/yuiseki__maplibre-tile-spec/docs/implementation-guide.md`
-92. mlt-wasm: https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md, `ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-wasm/README.md`
+90. MLT columnar layout: https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md, https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md, `ref-repos/maplibre__maplibre-tile-spec/docs/overview.md`, `ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md`
+91. MLT in-memory model: https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/implementation-guide.md, `ref-repos/maplibre__maplibre-tile-spec/docs/implementation-guide.md`
+92. mlt-wasm: https://github.com/maplibre/maplibre-tile-spec/blob/main/rust/mlt-wasm/README.md, `ref-repos/maplibre__maplibre-tile-spec/rust/mlt-wasm/README.md`
 93. RustGIS CPU reference renderer: `ref-repos/opengeos__RustGIS/docs/user-guide/maps.md`, `ref-repos/opengeos__RustGIS/ROADMAP.md`, `ref-repos/opengeos__RustGIS/docs/architecture.md`
 94. RustGIS vector tile meshes: https://github.com/opengeos/RustGIS/issues/596, https://github.com/opengeos/RustGIS/pull/606, https://github.com/opengeos/RustGIS/pull/611, https://github.com/opengeos/RustGIS/commit/d724d89, https://github.com/opengeos/RustGIS/commit/9f318db
 95. reearth-papers render concurrency: https://github.com/reearth/reearth-papers/commit/2007668, https://github.com/reearth/reearth-papers/commit/eabf229, `ref-repos/reearth__reearth-papers/CONTRIBUTING.md`

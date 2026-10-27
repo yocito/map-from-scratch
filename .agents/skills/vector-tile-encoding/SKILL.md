@@ -261,13 +261,13 @@ Skip what the narrow purpose makes unnecessary:
 Local paths are under `ref-repos/` of this repository; commits are in the
 corresponding clone or on GitHub.
 
-1. ref-repos/yuiseki__maplibre-tile-spec/docs/benchmarks.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md
-2. ref-repos/yuiseki__maplibre-tile-spec/docs/overview.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md; ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/README.md
-3. ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v1.md; ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-wasm/README.md
-4. ref-repos/yuiseki__maplibre-tile-spec/docs/specification/v2.md
-5. ref-repos/yuiseki__maplibre-tile-spec/docs/encodings.md
-6. ref-repos/yuiseki__maplibre-tile-spec/docs/implementation-guide.md
-7. ref-repos/yuiseki__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
+1. ref-repos/maplibre__maplibre-tile-spec/docs/benchmarks.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md
+2. ref-repos/maplibre__maplibre-tile-spec/docs/overview.md; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/overview.md; ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/README.md
+3. ref-repos/maplibre__maplibre-tile-spec/docs/specification/v1.md; ref-repos/maplibre__maplibre-tile-spec/rust/mlt-wasm/README.md
+4. ref-repos/maplibre__maplibre-tile-spec/docs/specification/v2.md
+5. ref-repos/maplibre__maplibre-tile-spec/docs/encodings.md
+6. ref-repos/maplibre__maplibre-tile-spec/docs/implementation-guide.md
+7. ref-repos/maplibre__maplibre-tile-spec/rust/mlt-core/CHANGELOG.md
 8. https://github.com/yuiseki/maplibre-tile-spec/commit/a7eac51d; https://github.com/yuiseki/maplibre-tile-spec/commit/85684b59
 9. https://github.com/yuiseki/maplibre-tile-spec/commit/364a9852; https://github.com/yuiseki/maplibre-tile-spec/commit/2deacaa4
 10. https://github.com/yuiseki/maplibre-tile-spec/commit/89ceaef3

@@ -249,7 +249,7 @@ Local paths are relative to the repository; `rr/` is `ref-repos/`.
 24. https://github.com/maplibre/maplibre-rs/blob/main/docs/src/development-documents/font-rendering.md ; `rr/maplibre__maplibre-rs/maplibre/src/legacy/glyph_atlas.rs`
 25. https://github.com/maplibre/maplibre-rs/issues/36 ; https://github.com/maplibre/maplibre-rs/pull/314
 26. https://github.com/maplibre/maplibre-rs/commit/0d70a47 ; https://github.com/maplibre/maplibre-rs/commit/1ea2b5c ; `rr/maplibre__maplibre-rs/maplibre/src/legacy/mod.rs`
-27. `rr/yuiseki__maplibre-tile-spec/docs/benchmarks.md` ; `rr/yuiseki__maplibre-tile-spec/docs/encodings.md` ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/encodings.md
+27. `rr/maplibre__maplibre-tile-spec/docs/benchmarks.md` ; `rr/maplibre__maplibre-tile-spec/docs/encodings.md` ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/benchmarks.md ; https://github.com/maplibre/maplibre-tile-spec/blob/main/docs/encodings.md
 28. https://github.com/yuiseki/maplibre-tile-spec/commit/e2da710d ; https://github.com/yuiseki/maplibre-tile-spec/commit/92207bdd ; https://github.com/yuiseki/maplibre-tile-spec/commit/816ecece
 29. https://github.com/yuiseki/maplibre-tile-spec/commit/d52cf9b0
 30. https://github.com/yuiseki/maplibre-tile-spec/commit/c9c39700

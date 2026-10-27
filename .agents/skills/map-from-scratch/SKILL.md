@@ -72,7 +72,7 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    bytes out so that one or a few HTTP Range requests fetch exactly that:
    index first, then blocks ordered by space (Hilbert, Morton) or time,
    quantised, delta-coded, columnar where it helps. Read the ideas in
-   `ref-repos/yuiseki__maplibre-tile-spec` (MLT: columnar layout, FastPFOR,
+   `ref-repos/maplibre__maplibre-tile-spec` (MLT: columnar layout, FastPFOR,
    dictionary and FSST strings, pre-tessellation) and
    `ref-repos/kenjiyoshidahome2026-bit__ortho-earth/packages/geopbf`
    (GPL-3), and the PMTiles spec. Measure the new structure against reading
