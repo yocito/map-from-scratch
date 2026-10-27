@@ -10,6 +10,9 @@ export interface Baked {
   walk: { m: number; min: number; steps: string[] };
   marks: [x: number, y: number, yaw: number][];
 }
+// The bird's-eye view: polygons as [palette index, path] in painter's order
+// (ground, route, then buildings), labels [text, x, y, angle, kind].
+export interface Bird { w: number; h: number; palette: string[]; polys: [number, string][]; labels: [string, number, number, number, number][]; route: string; start: XY; goal: XY }
 export interface Views { w: number; h: number; horizon: number; palette: string[]; list: View[] }
 // An eye-level view: walls as [palette index, path] in painter's order,
 // the route ribbon on the ground, and visible building names.
@@ -133,6 +136,45 @@ export function mountView(el: HTMLElement, vs: Views, v: View): HTMLCanvasElemen
   return canvas;
 }
 
+export function mountBird(el: HTMLElement, b: Bird): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', '南西の上空から見た池袋駅東口とグランドスケープ池袋の鳥瞰図 (建物の形と高さによる模式図)');
+  el.prepend(canvas);
+  const ctx = canvas.getContext('2d')!;
+  const polys = b.polys.map(([c, d]) => [b.palette[c], new Path2D(d)] as const);
+  const route = new Path2D(b.route);
+  new ResizeObserver(() => {
+    const css = el.clientWidth, k = (css * devicePixelRatio) / b.w;
+    canvas.width = Math.round(b.w * k); canvas.height = Math.round(b.h * k);
+    canvas.style.width = `${css}px`;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    const sky = ctx.createLinearGradient(0, 0, 0, b.h);
+    sky.addColorStop(0, '#c4dcef'); sky.addColorStop(1, '#f4f8fb');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, b.w, b.h);
+    ctx.lineJoin = 'round'; ctx.lineWidth = 0.8; ctx.strokeStyle = '#0002';
+    // Fill and outline each polygon; the outline also closes hairline seams.
+    for (const [c, p] of polys) { ctx.fillStyle = c; ctx.fill(p); ctx.stroke(p); }
+    // The whole route over the buildings, dashed: hidden stretches stay readable.
+    ctx.setLineDash([14, 10]); ctx.lineCap = 'round';
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 9; ctx.stroke(route);
+    ctx.strokeStyle = '#1a73e8'; ctx.lineWidth = 5; ctx.stroke(route);
+    ctx.setLineDash([]);
+    for (const [[x, y], c] of [[b.start, '#1a73e8'], [b.goal, '#c41d12']] as const) {
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fillStyle = c; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.stroke();
+    }
+    for (const [text, x, y, a, kind] of b.labels) {
+      const [fill, , weight] = LABEL[kind], size = [30, 32, kind === 2 && text.startsWith('（') ? 30 : 40, 34][kind];
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      ctx.font = `${weight} ${size}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = size / 4; ctx.strokeText(text, 0, 0);
+      ctx.fillStyle = fill; ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+  }).observe(el);
+  return canvas;
+}
+
 const map: Baked = await (await fetch('../../data/baked/26-ikebukuro-cinema-access/map.json')).json();
 document.getElementById('walk')!.textContent = `池袋駅 東口から約${map.walk.m} m・徒歩約${map.walk.min}分`;
 document.getElementById('steps')!.append(...map.walk.steps.map((s) => Object.assign(document.createElement('li'), { textContent: s })));
@@ -140,8 +182,11 @@ const view = mount(document.getElementById('map')!, map);
 // The frame holding the map has been produced after the second rAF.
 requestAnimationFrame(() => requestAnimationFrame(async () => {
   performance.mark('map-shown');
-  // The eye-level views sit below the map: fetch and draw them only now.
-  const vs: Views = await (await fetch('../../data/baked/26-ikebukuro-cinema-access/views.json')).json();
+  // The bird's-eye and eye-level views sit below the map: fetch and draw
+  // them only now.
+  const [bird, vs]: [Bird, Views] = await Promise.all(['birdseye', 'views'].map(async (f) =>
+    (await fetch(`../../data/baked/26-ikebukuro-cinema-access/${f}.json`)).json())) as [Bird, Views];
+  mountBird(document.getElementById('bird')!, bird);
   const box = document.getElementById('views')!;
   vs.list.forEach((v, i) => {
     const fig = document.createElement('figure');
