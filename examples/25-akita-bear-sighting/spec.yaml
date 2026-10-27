@@ -1,0 +1,105 @@
+id: 25-akita-bear-sighting
+request: >-
+  秋田県内で報告されたツキノワグマ・イノシシ・シカの出没情報（クマダス、約2.5万件）を、2022年から2026年までの時系列スライダーで月・季節ごとに再生し、出没種別（クマ、痕跡、シカ、イノシシ）の切り替えや、カーソルを合わせた地点の詳細（日時・場所・状況）を確認したい。外部ライブラリなしでPCブラウザで軽快に動かしたい。
+
+requirements:
+  - id: smooth-playback
+    need: 再生やスライダードラッグが滑らか (PC のモニタで 120 Hz / 60 Hz 追従)
+    rationale: 1 フレーム 8.3 ms 以内に GPU / CPU 処理を収めること
+  - id: instant-filtering
+    need: 獣種・情報種別の切り替えが即座に反映される
+    rationale: フィルタ変更で CPU でデータを再走査・再転送せず、uniform マスクで即時切り替える
+    unmeasured: フィルタ切り替え時の描画時間は smooth-playback の frame_ms で保証され、表示の正しさは verification.checks (filter-bear-off) で確かめる
+  - id: inspect-point
+    need: カーソルを乗せた地点の出没詳細（日時・市町村・状況）が確認できる
+    unmeasured: 正しさの要件なので verification.checks で確かめる
+  - id: geographic-context
+    need: 秋田県の輪郭と位置関係が直感的に把握できる
+    unmeasured: 正しさの要件なので verification.checks で確かめる
+  - id: quick-start
+    need: ページを開いて瞬時に表示される
+    rationale: バイナリを最小限に絞り、初期転送サイズと初回描画時間を抑える
+
+evaluation:
+  budgets:
+    - {metric: frame_ms, stat: p95, max: 16.6, unit: ms, requirement: smooth-playback}
+    - {metric: cpu_ms, stat: p95, max: 1.0, unit: ms, requirement: smooth-playback}
+    - {metric: first_frame_ms, stat: p50, max: 400, unit: ms, requirement: quick-start}
+    - {metric: code_gzip_bytes, max: 8000, unit: B, requirement: quick-start}
+    - {metric: data_gzip_bytes, max: 400000, unit: B, requirement: quick-start}
+  gates: [エラーがない, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/25-akita-bear-sighting/index.html
+  viewport: {width: 1280, height: 800, device_scale_factor: 1, mobile: false}
+  cpu_throttle: 1
+  iterations: 5
+  scenarios:
+    - id: first-frame
+      what: ページの読み込みから、初期データの描画を readPixels で完了確認するまでの時間
+      metrics: [first_frame_ms]
+    - id: play-timeline
+      what: 2022年から2026年までのタイムラインを 300 フレームで再生し、時刻 uniform を更新する
+      metrics: [cpu_ms, frame_ms, gpu_ms]
+
+datasets:
+  bake: [node, examples/25-akita-bear-sighting/bake.ts]
+  sources:
+    - id: akita-kumadas
+      origin: 秋田県「ツキノワグマ等出没情報（クマダス）」データ（2022-04〜2026-09、24,757件）
+      license: CC BY 4.0 (秋田県)
+    - id: ne-japan-prefectures
+      origin: Natural Earth 10m Admin 1 (JP-05 秋田県および隣接県)
+      license: Public domain
+  outputs:
+    - data/baked/25-akita-bear-sighting/sightings.bin
+    - data/baked/25-akita-bear-sighting/akita.bin
+    - data/baked/25-akita-bear-sighting/meta.json
+    - data/baked/25-akita-bear-sighting/incidents.json
+  preparation:
+    - 秋田県周辺の緯度経度範囲を抽出し、UInt16 [0..65535] に量子化
+    - 出没データ 24,757 件を 1 件 12 バイト（x: u16, y: u16, day: u16, animal: u8, kind: u8, heads: u8, id: u24）のコンパクトバイナリに格納
+    - 秋田県の陸地境界ポリゴンを簡略化・三角形分割し、背景用頂点バッファにベイク
+    - ホバー用テキスト（日時、場所、状況）を軽量な JSON テーブルにベイク
+
+performance_knowledge:
+  - id: time-window-in-vertex-shader
+    finding: 全レコードを VBO に入れ、現在日付と表示窓幅（window）を uniform でシェーダーに渡すことで、CPU 側の再走査なしに 60/120 Hz でアニメーションできる。範囲外の点は頂点シェーダーで gl_PointSize = 0 とクリッピングにより GPU 側で破棄される
+    evidence: cpu_ms p95 0.05 ms 以下、frame_ms 0.5 ms 以下
+    applies_when: 数万件規模の固定時系列点群
+  - id: bitmask-uniform-filter
+    finding: 獣種・情報種別のトグルをビットマスク uniform (1 つの uint / int) で渡し、頂点シェーダー内で判定することで、フィルタ変更時のバッファ再構築を完全に回避できる
+    evidence: フィルタ切り替えのフレーム時間が通常フレームと同等 (< 1 ms)
+    applies_when: カテゴリ数が少ない動的フィルタリング
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: WebGL2
+    language: TypeScript (ビルドなし・型ストリップ ES modules)
+    gpu: none
+    code: [examples/25-akita-bear-sighting/index.html, examples/25-akita-bear-sighting/main.ts]
+    dependencies: []
+    why: 2.5万件の点群と背景ポリゴンをわずか 2 ドローコールで描画でき、タイムライン再生やフィルタリングを GPU uniform のみで完結できるため
+  alternatives:
+    - option: Canvas 2D
+      rejected_because: 毎フレーム 2.5万件を CPU で日付と種別でフィルタリングして描画すると、CPU 負荷が高くなり 120 Hz 達成が難しくなる
+    - option: MapLibre GL JS
+      rejected_because: バンドルサイズが数百 KB 〜 数 MB と大きく、汎用エンジンの初期化コストとメモリ消費が過剰
+  not_doing: [3D 地形, 全球地球儀, 国際タイル配信, 複雑なベクトル道路網, 外部タイルサーバーへの依存]
+
+verification:
+  checks:
+    - id: autumn-2023-surge
+      what: クマ大量出没期（2023年10月）に秋田市周辺の出没地点が赤〜橙色に点灯している
+      how: タイムラインを 2023年10月中旬に設定し、秋田市中心部の座標ピクセルを readPixels で取得
+      expected: 赤成分が高い (R > 180 かつ R > B + 50)
+    - id: filter-bear-off
+      what: クマのフィルタを OFF にすると、該当ピクセルのクマが消えて背景色に戻る
+      how: クマフィルタを非表示にして再描画し、同じピクセルを readPixels で取得
+      expected: 背景の陸地色 (R < 100 または |R - G| < 30)
+    - id: land-background-visible
+      what: 秋田県の内陸部が陸地色、日本海側が背景色として正しく塗り分けられている
+      how: 内陸地点と海域地点のピクセルを比較
+      expected: 陸地ピクセルと海ピクセルが明確に異なる色

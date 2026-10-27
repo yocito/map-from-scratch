@@ -20,7 +20,9 @@ RUN apt-get update \
 # DuckDB CLI for bake steps that read Parquet or GeoPackage (bake time only,
 # never shipped). Extensions are installed into the image; the wrapper points
 # every session at them, so a run needs no network for them.
-RUN curl -fsSL -o /tmp/duckdb.gz https://github.com/duckdb/duckdb/releases/download/v1.5.5/duckdb_cli-linux-amd64.gz \
+RUN ARCH=$(dpkg --print-architecture) \
+ && DUCKDB_ARCH=$([ "$ARCH" = "arm64" ] && echo "arm64" || echo "amd64") \
+ && curl -fsSL -o /tmp/duckdb.gz "https://github.com/duckdb/duckdb/releases/download/v1.5.5/duckdb_cli-linux-${DUCKDB_ARCH}.gz" \
  && gunzip -c /tmp/duckdb.gz > /usr/local/lib/duckdb-cli && chmod +x /usr/local/lib/duckdb-cli && rm /tmp/duckdb.gz \
  && mkdir -p /opt/duckdb/extensions \
  && /usr/local/lib/duckdb-cli -c "SET extension_directory='/opt/duckdb/extensions'; INSTALL spatial; INSTALL httpfs;" \

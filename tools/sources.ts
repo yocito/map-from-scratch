@@ -62,6 +62,13 @@ const SOURCES: Record<string, Source> = {
     remote: 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2025-01-01&endtime=2026-01-01&minmagnitude=4.5&eventtype=earthquake',
     copy: true,
   },
+  // Akita prefecture kumadas wildlife sightings (bear, boar, deer) 2022-2026. CC BY 4.0.
+  'akita-kumadas': {
+    out: 'akita_kumadas.csv',
+    local: '/sata_hdd_24tb/hf_data/akita-kumadas-wildlife-sighting/data/raw/2026-10-26/kumadas.csv',
+    remote: 'https://huggingface.co/datasets/yuiseki/akita-kumadas-wildlife-sighting/resolve/main/raw/2026-10-26/kumadas.csv',
+    copy: true,
+  },
   // OpenStreetMap, Tokyo 23 wards, 2026-08-31. ODbL. Only a local copy:
   // elsewhere, cut it from a Japan extract with osmium extract.
   'osm-tokyo23': {
