@@ -1,5 +1,6 @@
 import { decodePcpng } from './decode.ts';
 import { createRenderer, type Camera, type Mesh } from './render.ts';
+import { fallbackTiles, planTiles } from './tiles.ts';
 
 const SOURCE = 'https://tiles.gsj.jp/tiles/pcpng/mixed/tiles';
 const lon0 = 139.795922, lat0 = 35.711917;
@@ -17,7 +18,9 @@ const renderer = createRenderer(canvas);
 const camera: Camera = { x: 0, y: 0, distance: 780, yaw: 22, pitch: 62, width: 1, height: 1, size: 3.2 };
 interface Tile { z: number; x: number; y: number; mesh: Mesh | null; loading: boolean; failed: boolean; used: number }
 const tiles = new Map<string, Tile>();
-let pending = 0, requests = 0, bytes = 0, points = 0, gpuBytes = 0, lastError = '', scheduled = false;
+let pending = 0, prefetchPending = 0, requests = 0, bytes = 0, points = 0, gpuBytes = 0, lastError = '', scheduled = false;
+let previousDistance = camera.distance;
+let zoomIn = true;
 const key = (z: number, x: number, y: number) => `${z}/${x}/${y}`;
 
 function tile(z: number, x: number, y: number): Tile {
@@ -31,8 +34,9 @@ function schedule() {
   scheduled = true;
   requestAnimationFrame(() => { scheduled = false; draw(); });
 }
-async function load(t: Tile) {
+async function load(t: Tile, background: boolean) {
   t.loading = true; pending++;
+  if (background) prefetchPending++;
   try {
     const response = await fetch(`${SOURCE}/${t.z}/${t.x}/${t.y}.webp`);
     if (response.status === 404) { t.failed = true; return; }
@@ -47,26 +51,35 @@ async function load(t: Tile) {
     const cloud = decodePcpng(image.data, image.width, image.height, origin);
     t.mesh = renderer.upload(cloud); points += cloud.count; gpuBytes += t.mesh.bytes;
   } catch (error) { t.failed = true; lastError = String(error); }
-  finally { t.loading = false; pending--; schedule(); }
+  finally { t.loading = false; pending--; if (background) prefetchPending--; schedule(); }
 }
 function draw() {
   camera.width = canvas.clientWidth; camera.height = canvas.clientHeight;
   const z = Math.max(14, Math.min(20, Math.round(20 - Math.log2(camera.distance / 130))));
-  const centerX = Math.floor((mx0 + camera.x / world) * 2 ** z);
-  const centerY = Math.floor((my0 - camera.y / world) * 2 ** z);
-  const wanted: Tile[] = [];
-  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) wanted.push(tile(z, centerX + dx, centerY + dy));
-  wanted.sort((a, b) => Math.hypot(a.x - centerX, a.y - centerY) - Math.hypot(b.x - centerX, b.y - centerY));
+  if (camera.distance !== previousDistance) zoomIn = camera.distance < previousDistance;
+  const plan = planTiles(z, mx0 + camera.x / world, my0 - camera.y / world, zoomIn);
+  previousDistance = camera.distance;
+  const wanted = plan.visible.map(({ z, x, y }) => tile(z, x, y));
+  const prefetch = plan.prefetch.map(({ z, x, y }) => tile(z, x, y));
   const now = performance.now();
-  for (const t of wanted) t.used = now;
+  for (const t of [...wanted, ...prefetch]) t.used = now;
   for (const t of wanted) {
     if (pending >= 5) break;
-    if (!t.mesh && !t.loading && !t.failed) void load(t);
+    if (!t.mesh && !t.loading && !t.failed) void load(t, false);
   }
-  let shown = wanted.filter(t => t.mesh).map(t => t.mesh!);
-  // Keep the previous resolution visible while a new zoom level arrives.
-  if (!shown.length) shown = [...tiles.values()].filter(t => t.mesh && now - t.used < 20000).slice(-25).map(t => t.mesh!);
-  renderer.draw(camera, shown);
+  // The visible level fills first. At most two background requests run so a
+  // change of view retains room for foreground requests.
+  if (wanted.every(t => t.mesh || t.failed)) {
+    for (const t of prefetch) {
+      if (pending >= 5 || prefetchPending >= 2) break;
+      if (!t.mesh && !t.loading && !t.failed) void load(t, true);
+    }
+  }
+  const shown = wanted.filter(t => t.mesh).map(t => t.mesh!);
+  const fallback = fallbackTiles(wanted.filter(t => !t.mesh), (level, x, y) => !!tiles.get(key(level, x, y))?.mesh)
+    .map(({ z, x, y }) => tiles.get(key(z, x, y))!);
+  for (const t of fallback) t.used = now;
+  renderer.draw(camera, [...fallback.map(t => t.mesh!), ...shown]);
   if (gpuBytes > 120 * 1048576) {
     for (const t of [...tiles.values()].filter(t => t.mesh && t.used !== now).sort((a, b) => a.used - b.used)) {
       if (gpuBytes < 85 * 1048576) break;
@@ -75,7 +88,8 @@ function draw() {
     }
   }
   detail.textContent = `z${z} · 視点距離 ${Math.round(camera.distance)} m · 点サイズ ${camera.size.toFixed(1)}`;
-  status.textContent = `${shown.length} タイル表示 · 読込中 ${pending} · ${points.toLocaleString()} 点取得 · ${(bytes / 1048576).toFixed(1)} MiB / ${requests} 件${lastError ? ` · ${lastError}` : ''}`;
+  const prefetched = prefetch.filter(t => t.mesh || t.failed).length;
+  status.textContent = `${shown.length} タイル表示${fallback.length ? ` ＋ ${fallback.length} 補完` : ''} · 前後のズームを先読み ${prefetched}/${prefetch.length} · 読込中 ${pending} · ${points.toLocaleString()} 点取得 · ${(bytes / 1048576).toFixed(1)} MiB / ${requests} 件${lastError ? ` · ${lastError}` : ''}`;
 }
 
 const places: Record<string, [number, number, number]> = {

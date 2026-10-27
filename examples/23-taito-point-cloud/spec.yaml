@@ -6,7 +6,7 @@ requirements:
     unmeasured: GSJ の統合点群 PNG から台東区周辺のタイルを選び、位置・標高・RGB を WebGL2 の点で描く。
   - id: stream
     need: 必要な範囲と解像度だけを読み込む
-    unmeasured: 視点距離でズームレベルを選び、中心周囲の 5×5 タイルを同時最大5件で取得する。
+    unmeasured: 視点距離でズームレベルを選び、表示用 5×5 タイルを優先して取得した後、前後のズームの中心 3×3 タイルを先読みする。
   - id: attribution
     need: 出典を示す
     unmeasured: GSJ と東京都デジタルツイン実現プロジェクトへの帰属リンクを画面に表示する。
@@ -34,7 +34,7 @@ architecture_selection:
     api: WebGL2、Fetch、createImageBitmap
     language: TypeScript
     gpu: hardware
-    code: [examples/23-taito-point-cloud/index.html, examples/23-taito-point-cloud/main.ts, examples/23-taito-point-cloud/decode.ts, examples/23-taito-point-cloud/render.ts]
+    code: [examples/23-taito-point-cloud/index.html, examples/23-taito-point-cloud/main.ts, examples/23-taito-point-cloud/tiles.ts, examples/23-taito-point-cloud/decode.ts, examples/23-taito-point-cloud/render.ts]
     dependencies: []
     why: 点群 PNG の復号と表示だけに特化したレンダラーで、地図エンジンを読み込まない。
   alternatives:
