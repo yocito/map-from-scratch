@@ -3,7 +3,7 @@ request: 全球の標高を軽く読み、地域別の高解像度 PMTiles は R
 requirements:
   - id: range
     need: 巨大な地域別 PMTiles を全量取得せず、表示に必要な索引と標高タイルを HTTP Range で読む
-    unmeasured: 地域別 PMTiles への通信で Range を指定し、HTTP 206 と長さを確認する。通信回数と取得量を画面に示す。
+    unmeasured: 地域別 PMTiles への通信で Range を指定し、HTTP 200 は本文を破棄して別 URL で最大4回再試行する。206 の長さと位置を確認し、通信回数と取得量を画面に示す。
   - id: terrain
     need: 全球の標高を WebGL2 で 3D の地形として描く
     unmeasured: Terrarium 標高を球面メッシュと陰影に使う。標高による色分けを表示する。

@@ -11,8 +11,10 @@ export const rangeStats = { requests: 0, bytes: 0 };
 export const tileStats = { requests: 0, bytes: 0 };
 
 async function read(url: string, start: number, length: number): Promise<Uint8Array> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const response = await fetch(url, { headers: { Range: `bytes=${start}-${start + length - 1}` } });
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const requestUrl = new URL(url);
+    if (attempt) requestUrl.searchParams.set('retry', String(attempt));
+    const response = await fetch(requestUrl, { headers: { Range: `bytes=${start}-${start + length - 1}` }, cache: 'no-store' });
     if (response.status === 200) {
       await response.body?.cancel();
       continue;
