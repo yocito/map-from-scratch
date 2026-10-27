@@ -1,5 +1,5 @@
-// Browse Mapterhorn's global PMTiles by Range and its z13-17 zxy endpoint.
-import { openArchive, rangeStats, tileStats } from './pmtiles.ts';
+// Browse Mapterhorn's global and regional PMTiles entirely by HTTP Range.
+import { openArchive, rangeStats } from './pmtiles.ts';
 import { createGlobe, type Patch } from './gl.ts';
 
 const R = 6371000;
@@ -92,7 +92,7 @@ async function makeTexture(bytes: Uint8Array): Promise<TileImage> {
 function focusHeight(): number {
   const x = (lon + 180) / 360;
   const y = (1 - Math.asinh(Math.tan(lat * radians)) / Math.PI) / 2;
-  for (let z = 17; z >= 0; z--) {
+  for (let z = 18; z >= 0; z--) {
     const scale = 2 ** z, tx = Math.floor(x * scale), ty = Math.floor(y * scale);
     const image = cache.get(`${z}/${tx}/${ty}`);
     if (!image) continue;
@@ -170,7 +170,7 @@ function draw() {
   globe.draw({ lon, lat, altitude: altitude(), focusHeight: focusHeight(), pitch, exaggeration: exag, width: canvas.clientWidth, height: canvas.clientHeight }, patches);
   zoomLabel.textContent = `標高 z${target} · ${Math.round(altitude() / 1000).toLocaleString('ja-JP')} km 上空`;
   pitchLabel.textContent = `傾き ${Math.round(pitch)}°`;
-  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · PMTiles Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB · 高解像度 ${tileStats.requests} 枚 / ${(tileStats.bytes / 1048576).toFixed(1)} MiB`;
+  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · PMTiles Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB`;
 }
 
 function setView(place: { lon: number; lat: number; zoom: number; pitch: number; exag: number }) {

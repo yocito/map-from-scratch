@@ -1,5 +1,5 @@
 id: 21-mapterhorn-planet-terrain
-request: planet.pmtiles を Range で読み、さらに高解像度タイルへ切り替え、地球全体から地域の標高まで専用レンダラーで 3D 表示したい。
+request: planet.pmtiles と地域別の高解像度 PMTiles を Range で読み、地球全体から地域の標高まで専用レンダラーで 3D 表示したい。
 requirements:
   - id: range
     need: 巨大な PMTiles を全量取得せず、表示に必要な索引と標高タイルを HTTP Range で読む
@@ -9,7 +9,7 @@ requirements:
     unmeasured: Terrarium 標高を球面メッシュと陰影に使う。標高による色分けを表示する。
   - id: high-resolution
     need: planet.pmtiles の上限 z12 を超える地域でも詳細な標高を表示する
-    unmeasured: z13～17 は Mapterhorn の単一 WebP タイルを取得し、存在しない場所では親タイルを使う。
+    unmeasured: download_urls.json の bbox と最大ズームから地域別 PMTiles を選び、必要なタイルを Range で取得する。存在しない場所では親タイルを使う。
   - id: navigation
     need: 全球から山岳地域へ移動し、斜めから地形を見る
     unmeasured: ズーム、ドラッグ、傾斜、高さの強調と地域プリセットを用意する。
@@ -30,23 +30,24 @@ datasets:
     - id: mapterhorn-planet
       origin: https://z.yuiseki.net/static/mapterhorn/2026-01-06/planet.pmtiles
       license: Mapterhorn の帰属表示に従う。日本の標高には国土地理院 基盤地図情報（数値標高モデル）を含む。
-    - id: mapterhorn-zxy
-      origin: https://tiles.mapterhorn.com/{z}/{x}/{y}.webp
+    - id: mapterhorn-areas
+      origin: https://download.mapterhorn.com/download_urls.json
       license: Mapterhorn の帰属表示に従う。
   outputs: []
   preparation:
     - z0～12 はブラウザで PMTiles v3 の索引を読み、現在表示する WebP Terrarium タイルだけを Range で取得する
-    - z13～17 は必要な WebP Terrarium タイルを単一タイル HTTP エンドポイントから取得する
+    - z13～18 は一覧にある bbox とズーム範囲から対象の地域別 PMTiles を選ぶ
+    - 選んだ PMTiles のヘッダー、索引、WebP Terrarium タイルを HTTP Range で取得する
 performance_knowledge: []
 architecture_selection:
   chosen:
     platform: browser
-    api: WebGL2、Fetch Range、Fetch、DecompressionStream
+    api: WebGL2、Fetch Range、DecompressionStream
     language: TypeScript
     gpu: hardware
     code: [examples/21-mapterhorn-planet-terrain/index.html, examples/21-mapterhorn-planet-terrain/main.ts, examples/21-mapterhorn-planet-terrain/gl.ts, examples/21-mapterhorn-planet-terrain/pmtiles.ts]
     dependencies: []
-    why: 全球の Range 取得と地域の単一高解像度タイルを切り替え、球面と起伏を専用シェーダーで描く
+    why: 全球と地域別のアーカイブから表示に必要な標高だけを Range 取得し、球面と起伏を専用シェーダーで描く
   alternatives:
     - MapLibre GL JS の terrain プラグインは専用レンダラーという依頼に合わないため採用しない
   not_doing: [衛星写真の重ね合わせ, 極点周辺の標高, 一般的な地図エンジン]
