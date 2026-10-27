@@ -97,7 +97,8 @@ for GPU examples, the nvidia container runtime. The repo is GPL-3.0-or-later.
    projection-and-globe, raster-tiles, simplification-and-generalization,
    startup-and-bundle-size, style-and-expressions, symbols-and-icons,
    terrain-and-elevation, testing-and-benchmarking, text-rendering,
-   tile-cache-and-loading, tile-lod-and-overzoom, vector-tile-encoding,
+   tile-cache-and-loading, tile-lod-and-overzoom, plateau-3d-tiles,
+   vector-tile-encoding,
    worker-threading; and yuiseki-open-data for the data itself. Then search
    `ref-repos/` (`rg -l` by concept, then read the few files that implement
    it) for the code, and note in `performance_knowledge` or a code comment

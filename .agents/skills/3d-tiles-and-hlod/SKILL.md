@@ -12,10 +12,10 @@ enough, descends when it is not, and streams, caches and evicts content as
 the camera moves. Every engine below got some part of this wrong first: the
 error test, the bounding volume, empty or missing children, memory that was
 never released, per-feature bookkeeping that cost more than drawing, or
-float precision. The examples in this repository are all flat 2D so far
-(README.md); this skill is for the first request that needs streamed 3D
-content, and most of its advice is about what a fixed, baked dataset lets
-you leave out.
+float precision. Example 22 streams PLATEAU buildings; for its live data,
+rendering and cache pitfalls, also read
+[plateau-3d-tiles](../plateau-3d-tiles/SKILL.md). Most advice here concerns
+what a fixed, baked dataset lets you leave out.
 
 ## Selection: bounding volumes and the error test
 
@@ -172,9 +172,11 @@ off by default in 3D [16, 17].
   and record per node: a lon/lat/height region for distance and error [8], a
   box in the render frame for the frustum test [8, 36], a double-precision
   origin [24], and the geometric error.
-- **Fix the error threshold at bake time** for the data and device you
-  measured; if you expose it, clamp it [52]. Treat leaves as final [21] and
-  drop empty nodes from the tree and from the bounds [31].
+- **Choose the error threshold from visible coverage and measured traffic**
+  for the data and device. A loose threshold can finish quickly while showing
+  sparse parent content, as example 22 demonstrated. If you expose it, clamp
+  it [52]. Treat leaves as final [21] and drop empty nodes from the tree and
+  from the bounds [31].
 - **Skip levels** you do not need to show on the way down [56]; for additive
   content request only visible children [44]; drop queued requests that left
   the frustum [30].
@@ -195,10 +197,11 @@ off by default in 3D [16, 17].
   appears at the closest zoom [21], and that the near/far planes are finite
   [31]. Fast frames from a traversal that stopped early are the HLOD form of
   "the renderer drew nothing" (pitfalls.md).
-- **When a general engine is the right call**: if the request names a live
-  third-party tileset (Google Photorealistic, Cesium ion) that changes or is
-  not ours to bake, put the engine under `baselines/` and measure; the
-  narrow-renderer approach applies only to data we can rebake.
+- **When a general engine is the right call**: if the request needs broad
+  coverage of changing third-party 3D Tiles formats, extensions or styling,
+  put the engine under `baselines/` and measure. A live tileset can still use
+  a narrow renderer when its actual format subset has been inspected and
+  documented, as example 22 does for PLATEAU.
 
 Per-engine detail (what each changed, when, and the open questions) is in
 references/engines.md.
