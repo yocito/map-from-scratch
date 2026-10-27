@@ -14,10 +14,35 @@ interface Box { center: [number, number, number]; radius: number }
 interface View { eye: [number, number, number]; forward: [number, number, number]; right: [number, number, number]; up: [number, number, number]; tanX: number; tanY: number }
 interface Tile { box: Box; error: number; depth: number; url: string | null; children: Tile[]; mesh: Mesh | null; loading: boolean; failed: boolean; lastUse: number }
 interface City { url: string; box: Box; root: Tile | null; loading: boolean; failed: boolean }
-let cities: City[] = [], scheduled = false, pending = 0, cityPending = 0, gpuBytes = 0, received = 0, requests = 0, lastError = '';
+let cities: City[] = [], scheduled = false, pending = 0, cityPending = 0, gpuBytes = 0, received = 0, requests = 0, cacheHits = 0, lastError = '';
 const queue = new Set<Tile>();
 const loaded = new Set<Tile>();
 const cityQueue = new Set<City>();
+let tileCache: Promise<Cache | null> | null = null;
+
+function openTileCache(): Promise<Cache | null> {
+  return tileCache ??= ('caches' in window ? caches.open('plateau-b3dm-v1').catch(() => null) : Promise.resolve(null));
+}
+
+async function tileBytes(url: string): Promise<ArrayBuffer> {
+  const cache = await openTileCache();
+  try {
+    const saved = await cache?.match(url);
+    if (saved) { cacheHits++; return saved.arrayBuffer(); }
+  } catch { /* Storage may be unavailable; HTTP still works. */ }
+  const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
+  if (!response.ok) throw new Error(`建物タイル: HTTP ${response.status}`);
+  const bytes = await response.arrayBuffer();
+  received += bytes.byteLength; requests++;
+  if (cache && bytes.byteLength <= 8 * 1048576) {
+    void cache.put(url, new Response(bytes)).then(async () => {
+      // Keep the useful nearby set without filling the origin's storage.
+      const keys = await cache.keys();
+      for (const key of keys.slice(0, Math.max(0, keys.length - 96))) await cache.delete(key);
+    }).catch(() => {});
+  }
+  return bytes;
+}
 
 function node(raw: any, base: string, depth = 0): Tile {
   if (!raw.boundingVolume?.region) throw new Error('region 以外の 3D Tiles 境界です');
@@ -77,12 +102,7 @@ function pumpTiles() {
     if (pending >= 5) break;
     if (!tile.url || tile.mesh || tile.loading || tile.failed) continue;
     tile.loading = true; pending++;
-    fetch(tile.url, { signal: AbortSignal.timeout(60000) }).then(async response => {
-      if (!response.ok) throw new Error(`建物タイル: HTTP ${response.status}`);
-      const bytes = await response.arrayBuffer();
-      received += bytes.byteLength; requests++;
-      return decodeTile(bytes);
-    }).then(geometry => {
+    tileBytes(tile.url).then(decodeTile).then(geometry => {
       tile.mesh = renderer.upload(geometry);
       gpuBytes += tile.mesh.bytes;
       loaded.add(tile);
@@ -94,9 +114,13 @@ function choose(tile: Tile, budget: { count: number }, frame: View): { ready: bo
   if (!visible(tile.box, frame)) return { ready: true, meshes: [] };
   if (budget.count >= 240) return { ready: false, meshes: [] };
   budget.count++;
+  // Load a coarse parent first; only descend once it can cover its children.
+  if (tile.url && !tile.mesh) { enqueue(tile); return { ready: false, meshes: [] }; }
   const distance = Math.max(1, Math.hypot(tile.box.center[0] - frame.eye[0], tile.box.center[1] - frame.eye[1], tile.box.center[2] - frame.eye[2]) - tile.box.radius);
   const errorPixels = tile.error * Math.max(1, canvas.clientHeight) / (2 * Math.tan(Math.PI / 6) * distance);
-  if (tile.children.length && (!tile.url || errorPixels > 5) && budget.count < 240) {
+  // Far views value coverage over leaf geometry. Zooming in lowers the error allowance.
+  const targetPixels = Math.max(16, Math.min(64, camera.distance / 110));
+  if (tile.children.length && (!tile.url || errorPixels > targetPixels) && budget.count < 240) {
     const children = tile.children.filter(child => visible(child.box, frame))
       .sort((a, b) => Math.hypot(a.box.center[0] - camera.x, a.box.center[1] - camera.y) - Math.hypot(b.box.center[0] - camera.x, b.box.center[1] - camera.y))
       .map(child => choose(child, budget, frame));
@@ -128,7 +152,7 @@ function draw() {
     }
   }
   scale.textContent = `視点距離 ${(camera.distance / 1000).toFixed(camera.distance < 10000 ? 1 : 0)} km`;
-  status.textContent = `${nearby.length} 区 · ${meshes.length} 建物タイル表示 · 読込中 ${pending + cityPending} · ${(received / 1048576).toFixed(1)} MiB / ${requests} 件${lastError ? ` · ${lastError}` : ''}`;
+  status.textContent = `${nearby.length} 区 · ${meshes.length} 建物タイル表示 · 読込中 ${pending + cityPending} · 取得 ${(received / 1048576).toFixed(1)} MiB / ${requests} 件 · 保存済み ${cacheHits} 件${lastError ? ` · ${lastError}` : ''}`;
 }
 
 const places: Record<string, [number, number, number]> = {
