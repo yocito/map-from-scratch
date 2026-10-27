@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>グランドシネマサンシャイン 池袋への行き方</title>
+<style>
+  body { margin: 0 auto; max-width: 640px; padding: 12px 16px 24px; font: 15px/1.6 system-ui, sans-serif; background: #fff; color: #222; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  #walk { margin: 0 0 8px; font-weight: 600; color: #1557c0; }
+  #map { border-radius: 8px; overflow: hidden; background: #f2efe8; aspect-ratio: 1; }
+  ol { padding-left: 1.4em; margin: 10px 0; }
+  small { color: #666; }
+  figure { margin: 14px 0; }
+  figure canvas { display: block; border-radius: 8px; }
+  figcaption { font-weight: 600; margin-top: 4px; }
+  #views-note { color: #666; font-size: 13px; }
+</style>
+<h1>グランドシネマサンシャイン 池袋</h1>
+<p id="walk"></p>
+<div id="map"></div>
+<ol id="steps"></ol>
+<h2 style="font-size:16px;margin:18px 0 0">途中の見え方</h2>
+<p id="views-note">地図の番号の位置から矢印の向きに、目の高さで見た様子です。建物の形と高さ (OpenStreetMap、高さの記録がない建物は 4 階建てと仮定) から描いた模式図で、写真ではありません。</p>
+<div id="views"></div>
+<p>映画館はグランドスケープ池袋（豊島区東池袋一丁目30番）の中にあります。</p>
+<small>地図データ © OpenStreetMap contributors (ODbL)</small>
+<!-- Fetch the map data alongside main.ts rather than after it. -->
+<link rel="preload" href="../../data/baked/26-ikebukuro-cinema-access/map.json" as="fetch" crossorigin>
+<script type="module" src="./main.ts"></script>

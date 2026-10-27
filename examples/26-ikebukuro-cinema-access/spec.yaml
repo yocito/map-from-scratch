@@ -1,0 +1,182 @@
+id: 26-ikebukuro-cinema-access
+request: >-
+  池袋のグランドシネマサンシャインの場所をわかりやすく説明する地図を作りたい
+
+# 依頼から読み取った要件。数値にできるものは evaluation.budgets が指す。
+requirements:
+  - id: find-the-building
+    need: 目的地の建物がひと目でわかる
+    rationale: 映画館はグランドスケープ池袋の中にあるので、建物そのものを強調し、映画館名と建物名を建物の横に出す
+    unmeasured: 時間ではなく正しさの要件なので verification.checks の dest-highlighted と dest-label-drawn で確かめる
+  - id: how-to-get-there
+    need: 池袋駅からの道順がわかる
+    rationale: 初めて行く人の多くは池袋駅から歩く。駅の東口(中央)から建物までの徒歩経路を地図に引き、道順と徒歩時間を文章でも出す
+    unmeasured: 正しさの要件なので route-drawn、start-goal-markers、directions-shown で確かめる
+  - id: landmarks-on-the-way
+    need: 途中の目印の建物がどう見えるかわかる
+    rationale: 追加の依頼「目印になる建物がポイントポイントでどんなふうに見えるのか、シミュレーションしてレンダリングして挿入できる？」。経路上の 3 地点から目の高さで見た建物の立体を、地図の下に模式図として出す
+    unmeasured: 正しさの要件なので views-drawn で確かめる。見え方の正しさ (建物の高さ) は OSM のタグに依存し、高さのない 59% の建物は 4 階建てと仮定している
+  - id: readable-on-phone
+    need: スマホの画面で文字が読める
+    rationale: 道案内の地図は歩きながらスマホで見る。390 CSS px 幅で最小の文字 11 px 以上、文字同士が重ならない
+  - id: light-page
+    need: 案内ページに貼っても重くならない
+    rationale: 映画館の案内や記事に貼る部品なので、コードは数 KB、データは写真 1 枚より小さく (gzip 合計 40 KB 以下。立体図 3 枚を足す前は 25 KB としていた)
+  - id: quick-start
+    need: 開いてすぐ地図が出る
+    rationale: 4G (60 ms, 9 Mbps) と CPU 4 倍スロットルで、初回描画 p50 600 ms 以下
+  - id: smooth
+    need: 画面を回転したりサイズを変えたりしても、すぐ描き直される
+    rationale: サイズが変わると全体を 1 回描き直す。変更からその描き直しが画面に出るまで p95 100 ms 以下 (操作への応答が即時と感じられる上限)
+
+evaluation:
+  budgets:
+    - {metric: min_label_px, max: 100, min: 11, unit: px, requirement: readable-on-phone}
+    - {metric: label_overlaps, max: 0, unit: count, requirement: readable-on-phone}
+    - {metric: code_gzip_bytes, max: 4500, unit: B, requirement: light-page}
+    - {metric: data_gzip_bytes, max: 35000, unit: B, requirement: light-page}
+    - {metric: total_gzip_bytes, max: 40000, unit: B, requirement: light-page}
+    - {metric: first_frame_ms, stat: p50, max: 600, unit: ms, requirement: quick-start}
+    - {metric: resize_frame_ms, stat: p95, max: 100, unit: ms, requirement: smooth}
+  gates: [エラーがない, verification の check がすべて通る]
+
+benchmarks:
+  runtime: browser
+  page: examples/26-ikebukuro-cinema-access/index.html
+  viewport: {width: 390, height: 844, device_scale_factor: 3, mobile: true}
+  cpu_throttle: 4
+  network: {name: 4g, latency_ms: 60, download_mbps: 9, upload_mbps: 3}
+  iterations: 10
+  scenarios:
+    - id: first-frame
+      what: ナビゲーション開始から、map.json を読み mount() で地図を描いた後の 2 回目の rAF まで。main.ts が performance.mark('map-shown') を打ち、bench.ts の読み込みは含めない
+      metrics: [first_frame_ms]
+    - id: views
+      what: 地図の表示後に views.json を読み、立体図 3 枚を描き終えた時点 (main.ts の performance.mark('views-shown'))。予算はなく記録のみ
+      metrics: [views_shown_ms]
+    - id: resize
+      what: 地図の幅を 358 px と 300 px に交互に 20 回変え、変更から 2 回目の rAF (描き直した地図のフレームの後) までを測る。あわせて全体を描く命令を出す時間 60 回と、何も描かないときの rAF 間隔 60 回
+      metrics: [resize_frame_ms, redraw_ms, idle_frame_interval_ms]
+    - id: labels
+      what: 描いたラベルの実際の文字幅を measureText で測り、回転を含む外接矩形の重なりの組数と、CSS px での最小文字サイズを出す
+      metrics: [label_overlaps, min_label_px]
+
+datasets:
+  bake: [node, examples/26-ikebukuro-cinema-access/bake.ts]
+  sources:
+    - id: osm-tokyo23-polygon
+      origin: yuiseki/osm-tokyo23-src-2026-08 (OSM 2026-08-31、osm2pgsql 形式の GeoParquet、Hilbert 順、bbox 列つき) の planet_osm_polygon
+      license: ODbL 1.0 (© OpenStreetMap contributors)
+    - id: osm-tokyo23-line
+      origin: 同 planet_osm_line
+      license: ODbL 1.0 (© OpenStreetMap contributors)
+    - id: osm-tokyo23-point
+      origin: 同 planet_osm_point
+      license: ODbL 1.0 (© OpenStreetMap contributors)
+  outputs: [data/baked/26-ikebukuro-cinema-access/map.json, data/baked/26-ikebukuro-cinema-access/views.json]
+  preparation:
+    - 3 つの Parquet のフッターを HTTP Range で読み、bbox 列の行グループ統計が枠 (+150 m) に触れる行グループだけを読む (102 個中 25 個)。読んだ範囲は data/raw/osm-tokyo23-*.ranges/ にキャッシュする
+    - 枠は東口(中央)と映画館の中間を中心にした 700 m 四方。EPSG:3857 から 1,000 単位のグリッド (1 単位 0.7 m、北が上) へ一次変換する
+    - 面は公園・広場・建物・駅・目印の建物・目的地の 6 層、線は首都高・幹線・中通り・細街路・鉄道の 5 層。地下 (tunnel, layer<0, level<0, indoor) を除き、Douglas–Peucker 0.7 単位、30 平方単位未満の建物を除いて、層ごとに 1 本の SVG パス文字列 (相対整数座標) にする
+    - 徒歩経路は、歩ける道 (歩道・横断歩道・一般道、地下を除く) のグラフで東口(中央) の駅出口ノードから目的地の建物の外周までを Dijkstra で求める (裏道に入らないよう service ×1.4、階段 ×1.3)。道順の文章は経路の辺を通り名でまとめ、横断歩道は交わる道路名で「〜を渡る」にする
+    - ラベルはグリッド単位の固定サイズで、目的地、出発点、通り名 (同名の way をつないだ直線区間、なければその脇)、目印の建物の順に貪欲に置き、すでに置いたラベル・目的地の建物・出発点・ルートの線と重なる候補を捨てる
+
+performance_knowledge:
+  - id: verify-the-place-not-recall-it
+    finding: 目的地は記憶ではなくデータで特定する。最初の案では記憶から「キュープラザ池袋」と書いたが、OSM ではグランドシネマサンシャインのノードがあるのはグランドスケープ池袋 (way 705716220) の中だった
+    evidence: planet_osm_point の amenity=cinema「grand cinema sunshine」(node 1316303078) を含む建物ポリゴンは グランドスケープ池袋 のみ
+    applies_when: 特定の施設を案内する地図。施設名・建物名・住所は必ずデータから引く
+  - id: range-read-the-row-groups
+    finding: Hilbert 順で bbox 列の統計がある GeoParquet なら、街区規模の地図は行グループの統計で読む範囲を 1/4 に絞れる
+    evidence: polygon 71、line 19、point 12 の行グループのうち、枠に触れたのは計 25 個。初回の取得は 49.9 MB (必要な列の列チャンク全体、tags と way を含む)。2 回目以降はキャッシュから 0 MB
+    applies_when: 自治体より狭い範囲を、全国・都市単位の Parquet から切り出すベイク
+  - id: frame-to-the-walk
+    finding: 案内図は、歩く経路が枠の幅の半分以上を占めるくらいまで寄せる。広く取ると経路も目的地の建物も小さくなる
+    evidence: 1,040 m 四方 (v1) では 460 m の経路が帯のように細く、建物は 390 px 幅の画面で幅約 17 px。700 m 四方 (v2 以降) で約 24 px、ラベルの置き場も増え、データは 75.0 KB から 37.1 KB (gzip 15.0 KB) に減った
+    applies_when: 1 か所への道順を示す固定縮尺の地図
+  - id: join-ways-before-labelling
+    finding: OSM の道路は短い way に分かれているので、通り名を置く前に同名の way を端点でつなぐ。つながないと、名前が収まる長さの直線区間がない
+    evidence: つなぐ前はグリーン大通り・サンシャイン60通り・春日通り・劇場通りのラベルが置けなかった。つないだ後は劇場通り以外の 3 本が置けた
+    applies_when: OSM の線から通り名ラベルを置くとき
+  - id: route-boxes-not-bbox
+    finding: ラベルがルートを避ける判定は、ルートの外接矩形ではなく、線に沿った小さな矩形の列 (6 単位刻み、半幅 8) で行う。そうしないと、ルートが通る道の名前を線の脇に置けない
+    evidence: 区間ごとの外接矩形では「サンシャイン通り」の候補 21 個がすべて落ちた。小矩形の列にして、脇へずらす量を 15+30 単位にすると置けた
+    applies_when: 経路と通り名を同時に描く案内図
+  - id: crossing-names-vary
+    finding: 上下線が別の way の幹線では、同じ道路に名前の揺れ (明治通 / 明治通り) があり、横断が 2 回に見える。「〜り」付きが別にあればそちらに寄せてまとめる
+    evidence: 寄せる前の道順は「明治通を渡る」「明治通りを渡る」の 2 行だった
+    applies_when: OSM から横断歩道を含む道順の文章を作るとき
+
+  - id: below-the-fold-later
+    finding: 地図の下に置く立体図のデータと描画を初回描画の前に入れると、初回描画が倍近く遅れる。別ファイルにして、地図を表示した後に読む
+    evidence: 4G・4 倍スロットル・GPU なしで、map.json に同梱して先に描くと first_frame_ms p50 975 ms。views.json (52 KB、gzip 約 14.5 KB) に分けて後から読むと 550 ms、立体図は 926 ms に出る
+    applies_when: 主役の地図の下に補助の図を並べるページ
+  - id: preload-the-data
+    finding: データの取得は main.ts の実行を待たずに、index.html の link rel=preload で並行して始める
+    evidence: first_frame_ms p50 696 ms から 627 ms へ (4G、60 ms の往復 1 回分)
+    applies_when: ビルドなしの ES modules で、最初の fetch のデータが決まっているとき
+  - id: mark-the-first-frame-in-the-page
+    finding: 初回描画の印は bench.ts ではなくページ側 (performance.mark) で付ける。bench.ts を読み込んでから rAF を待つと、その読み込み (4G で約 1 往復) まで初回描画に数えてしまう
+    evidence: 同じページで 627 ms から 513 ms へ。差は bench.ts と harness/page/bench.ts の取得
+    applies_when: 初回描画を ?bench の動的 import の後で測る例すべて
+  - id: software-raster-resize
+    finding: GPU のない環境では、Canvas 2D の全体の描き直しのラスタ化だけで 1 フレームに 150 ms 前後かかり、リサイズの予算 (p95 100 ms) を満たせない。重いのは道路の丸い線端と建物の塗り
+    evidence: このコンテナ (WebGL なし、4 倍スロットル) で getImageData で同期した 1 層ずつの時間は 道路 64 ms、建物 30-41 ms、破線の鉄道 31 ms (実線で 14 ms)、文字 3 ms。resize_frame_ms p50 153-186 ms、p95 232-341 ms。GPU のある計測環境 (bin/mfs) ではまだ測っていない。例 01 の知見では GPU の canvas はフレーム間隔が約 20 倍速い
+    applies_when: Canvas 2D で 1,000 前後のパスを毎回描き直す地図を、GPU のない端末やコンテナで測るとき
+  - id: eye-level-views-at-bake-time
+    finding: 固定の視点からの立体図なら、透視投影、裏面の除去、近クリップ面と画面でのクリップ、建物単位の画家のアルゴリズムをすべてベイク時に済ませ、ページは多角形を塗るだけにできる。見えている建物の名前も、ベイク時に最前面の多角形を点ごとに調べて決められる
+    evidence: 3 視点で各 875-975 棟を対象に壁 502-626 枚。データは 52 KB (gzip 約 14.5 KB)、描画コードは 25 行ほど
+    applies_when: 道案内の「ここからはこう見える」図。視点が動く 3D には使えない
+  - id: heights-are-partial
+    finding: 池袋駅東側の OSM の建物で高さのタグがあるのは 41% (height 60 棟、building:levels のみ 197 棟、計 629 棟中)。残りは 4 階建て (13.2 m) と仮定したので、立体図の高さは模式的である
+    evidence: 139.711-139.719°E、35.728-35.733°N の building ポリゴンを数えた
+    applies_when: OSM の建物を立体にする例。PLATEAU のある地域ではそちらの高さを使える
+
+architecture_selection:
+  chosen:
+    platform: browser
+    api: Canvas 2D (Path2D, fillText)
+    language: TypeScript (ブラウザには型を除いた ES modules を配る。ビルドなし)
+    gpu: none
+    code: [examples/26-ikebukuro-cinema-access/index.html, examples/26-ikebukuro-cinema-access/main.ts]
+    dependencies: []
+    why: 縮尺も範囲も固定の 1 枚の案内図なので、描く形はすべてベイク時に決まる。層ごとに 1 本のパス文字列を Path2D に渡し、数十個のラベルを fillText で描くだけで足りる。目線の立体図も視点が固定なので、ベイク時に画面座標まで投影した多角形を同じ Path2D で塗る
+  alternatives:
+    - option: WebGL2
+      rejected_because: 三角形分割、線の太さのシェーダ、文字のグリフアトラスが要り、コードが何倍にもなる。固定の 1 枚では描画性能が要らない
+    - option: 画像 (PNG) をベイクして配る
+      rejected_because: 比べていない。DPR 3 の 1,170 px 四方の PNG は数百 KB になりそうで、道順の文章と地図の文字の対応も取れない
+    - option: SVG の DOM
+      rejected_because: 比べていない。同じくらい小さく作れる可能性はある
+    - option: 汎用地図エンジン (MapLibre など) とタイル
+      rejected_because: パン・ズーム・スタイル評価のためのコードが 200 KB を超え、案内に必要な強調と経路はどのみち自前で足すことになる
+  not_doing: [パン, ズーム, 回転, 視点を動かせる 3D, 屋根や壁の質感, タイル, 実行時の投影, 実行時の経路探索, 現在地, 地下通路の案内, 館内の案内, WebGL]
+
+verification:
+  checks:
+    - id: dest-highlighted
+      what: 目的地の建物の内側のピクセルが強調の赤で塗られている
+      how: 建物のパスの内側を 2 単位刻みで調べ、画面のピクセルが赤 (R>190, G<110, B<100) の割合を数える
+      expected: 60% 超
+    - id: dest-label-drawn
+      what: 目的地の名前の文字が実際に描かれている (CJK フォントがなくて消えていない)
+      how: measureText で求めた名前の矩形のピクセルのうち、ラベルの赤の割合を数える
+      expected: 8% 超
+    - id: route-drawn
+      what: 徒歩経路の線が画面に出ている
+      how: ベイクした経路に沿って 5 単位刻みに調べ、±2 単位以内にルートの青があるかを見る
+      expected: 90% 超の点で青
+    - id: start-goal-markers
+      what: 出発点の青い点と、到着点の赤い点が描かれている
+      how: 出発点と到着点の座標のピクセルの色
+      expected: 青と赤
+    - id: directions-shown
+      what: 道順の文章と徒歩時間がページに出ている
+      how: '#steps の li の数が道順の数と一致し、#walk に「徒歩約N分」がある'
+      expected: 一致する
+    - id: views-drawn
+      what: 目線の立体図 3 枚が描かれ、どれにもルートの青が出ていて、目的地の名前を出した図では目的地の赤の壁が見えている
+      how: 各図の canvas のピクセルを 7 画素おきに調べ、ルートの青と目的地の赤の割合を数える
+      expected: 3 枚、青 2% 超、名前を出した図では赤 0.3% 超
+  harness:
+    - canvas の contextlost が起きたらエラーにする

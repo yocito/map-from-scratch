@@ -1,7 +1,7 @@
 // Raw data shared by the examples, converted once into data/raw/.
 // Each source names a local copy (used when present, e.g. on yuisekin-z) and
 // where the same file comes from otherwise. Bake steps call source(name).
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync, openSync, readSync, fstatSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -101,6 +101,62 @@ export function source(name: string): string {
   }
   writeFileSync(stamp, settings);
   return out;
+}
+
+// Large files read in part, by byte range: the local copy when present,
+// otherwise HTTP Range requests whose answers are cached under data/raw/, so
+// a bake that needs a few row groups of a 151 MB Parquet file fetches a few MB
+// once and nothing afterwards.
+const OSM23 = '/sata_hdd_24tb/hf_data/__published/osm-tokyo23-src-2026-08/data/parquet';
+const OSM23_HF = 'https://huggingface.co/datasets/yuiseki/osm-tokyo23-src-2026-08/resolve/main/parquet';
+const RANGED: Record<string, { local: string; remote: string }> = Object.fromEntries(
+  ['point', 'line', 'polygon', 'roads'].map((t) => [`osm-tokyo23-${t}`, {
+    local: `${OSM23}/planet_osm_${t}.parquet`, remote: `${OSM23_HF}/planet_osm_${t}.parquet`,
+  }]));
+
+export interface Ranged { size: number; range: (offset: number, length: number) => Promise<Uint8Array>; fetched: () => number }
+
+export async function rangedSource(name: string): Promise<Ranged> {
+  const s = RANGED[name];
+  if (!s) throw new Error(`unknown ranged source ${name}`);
+  if (existsSync(s.local)) {
+    const fd = openSync(s.local, 'r');
+    return {
+      size: fstatSync(fd).size, fetched: () => 0,
+      range: async (o, n) => { const b = new Uint8Array(n); readSync(fd, b, 0, n, o); return b; },
+    };
+  }
+  const dir = join(rawDir, `${name}.ranges`);
+  mkdirSync(dir, { recursive: true });
+  let fetched = 0;
+  const get = async (o: number, n: number): Promise<{ b: Uint8Array; total: number }> => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await fetch(s.remote, { headers: { range: `bytes=${o}-${o + n - 1}` } });
+        if (r.status !== 206) throw new Error(`${name}: HTTP ${r.status} for a range request`);
+        const b = new Uint8Array(await r.arrayBuffer());
+        if (b.length !== n) throw new Error(`${name}: got ${b.length} bytes, asked for ${n}`);
+        fetched += n;
+        return { b, total: Number(r.headers.get('content-range')?.split('/')[1]) };
+      } catch (e) {
+        if (attempt === 3) throw e;
+        await new Promise((res) => setTimeout(res, 2000 << attempt));
+      }
+    }
+  };
+  const sizeFile = join(dir, 'size');
+  let size = existsSync(sizeFile) ? Number(readFileSync(sizeFile, 'utf8')) : 0;
+  if (!size) { size = (await get(0, 4)).total; writeFileSync(sizeFile, String(size)); }
+  return {
+    size, fetched: () => fetched,
+    range: async (o, n) => {
+      const f = join(dir, `${o}-${n}`);
+      if (existsSync(f)) return new Uint8Array(readFileSync(f));
+      const { b } = await get(o, n);
+      writeFileSync(f, b);
+      return b;
+    },
+  };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
