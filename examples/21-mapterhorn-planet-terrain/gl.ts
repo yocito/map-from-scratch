@@ -70,7 +70,7 @@ void main() {
   color = vec4(c * light + vec3(0.07, 0.12, 0.16) * rim, 1.0);
 }`;
 
-export interface Camera { lon: number; lat: number; altitude: number; pitch: number; exaggeration: number; width: number; height: number }
+export interface Camera { lon: number; lat: number; altitude: number; focusHeight: number; pitch: number; exaggeration: number; width: number; height: number }
 export interface Patch { z: number; x: number; y: number; sourceZ: number; sourceX: number; sourceY: number; texture: WebGLTexture | null }
 
 export function createGlobe(canvas: HTMLCanvasElement) {
@@ -145,7 +145,7 @@ export function createGlobe(canvas: HTMLCanvasElement) {
     const pitch = camera.pitch * Math.PI / 180;
     const forward = center.map((v, i) => -v * Math.cos(pitch) + north[i] * Math.sin(pitch));
     const up = north.map((v, i) => v * Math.cos(pitch) + center[i] * Math.sin(pitch));
-    const eye = center.map((v, i) => v * (R + camera.altitude) - north[i] * camera.altitude * Math.tan(pitch));
+    const eye = center.map((v, i) => v * (R + camera.focusHeight + camera.altitude) - north[i] * camera.altitude * Math.tan(pitch));
     const sun = center.map((v, i) => v + east[i] * 0.5 + north[i] * 0.8);
     const length = Math.hypot(...sun);
     gl.uniform3fv(U.camera, eye); gl.uniform3fv(U.forward, forward); gl.uniform3fv(U.right, east); gl.uniform3fv(U.up, up);

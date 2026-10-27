@@ -1,6 +1,5 @@
-// A global terrain viewer, without MapLibre. Browse Mapterhorn's 664 GB
-// PMTiles in place by Range, decoding only visible WebP Terrarium tiles.
-import { openArchive, rangeStats } from './pmtiles.ts';
+// Browse Mapterhorn's global PMTiles by Range and its z13-17 zxy endpoint.
+import { openArchive, rangeStats, tileStats } from './pmtiles.ts';
 import { createGlobe, type Patch } from './gl.ts';
 
 const R = 6371000;
@@ -16,7 +15,8 @@ interface TileCoord { z: number; x: number; y: number }
 let archive: Archive | null = null;
 let lon = 138.7, lat = 35.36, zoom = 0, pitch = 0, exag = 8;
 let error = '', scheduled = false;
-const cache = new Map<string, WebGLTexture | null>();
+interface TileImage { texture: WebGLTexture; rgba: Uint8ClampedArray }
+const cache = new Map<string, TileImage | null>();
 const used = new Map<string, number>();
 const pending = new Set<string>();
 const failures = new Map<string, number>();
@@ -80,13 +80,29 @@ function selectTiles(): { target: number; tiles: TileCoord[] } {
 const decodeCanvas = document.createElement('canvas');
 decodeCanvas.width = decodeCanvas.height = 512;
 const decodeContext = decodeCanvas.getContext('2d', { willReadFrequently: true })!;
-async function makeTexture(bytes: Uint8Array): Promise<WebGLTexture> {
+async function makeTexture(bytes: Uint8Array): Promise<TileImage> {
   const bitmap = await createImageBitmap(new Blob([Uint8Array.from(bytes)], { type: 'image/webp' }), { colorSpaceConversion: 'none' });
   if (bitmap.width !== 512 || bitmap.height !== 512) { bitmap.close(); throw new Error('想定外の標高タイル寸法です'); }
   decodeContext.drawImage(bitmap, 0, 0);
   bitmap.close();
   const rgba = decodeContext.getImageData(0, 0, 512, 512).data;
-  return globe.texture(rgba);
+  return { texture: globe.texture(rgba), rgba };
+}
+
+function focusHeight(): number {
+  const x = (lon + 180) / 360;
+  const y = (1 - Math.asinh(Math.tan(lat * radians)) / Math.PI) / 2;
+  for (let z = 17; z >= 0; z--) {
+    const scale = 2 ** z, tx = Math.floor(x * scale), ty = Math.floor(y * scale);
+    const image = cache.get(`${z}/${tx}/${ty}`);
+    if (!image) continue;
+    const px = Math.min(511, Math.floor((x * scale - tx) * 512));
+    const py = Math.min(511, Math.floor((y * scale - ty) * 512));
+    const i = (py * 512 + px) * 4;
+    const rgb = image.rgba;
+    return Math.max(0, rgb[i] * 256 + rgb[i + 1] + rgb[i + 2] / 256 - 32768) * exag;
+  }
+  return 0;
 }
 
 function enqueue(tile: TileCoord) {
@@ -114,7 +130,7 @@ function pump() {
           const victims = [...used.entries()].filter(([name]) => name !== '0/0/0' && !pending.has(name)).sort((a, b) => a[1] - b[1]);
           for (const [name] of victims.slice(0, Math.max(0, cache.size - 80))) {
             const old = cache.get(name);
-            if (old) globe.remove(old);
+            if (old) globe.remove(old.texture);
             cache.delete(name); used.delete(name);
           }
         }
@@ -139,21 +155,22 @@ function draw() {
     if (archive) {
       if (target >= 5) enqueue(parent(tile, Math.min(5, target)));
       if (target >= 9) enqueue(parent(tile, Math.min(9, target)));
+      if (target >= 13) enqueue(parent(tile, 12));
       enqueue(tile);
     }
     let source: TileCoord | null = null, texture: WebGLTexture | null = null;
     for (let z = tile.z; z >= 0; z--) {
       const ancestor = parent(tile, z);
       const found = cache.get(key(ancestor));
-      if (found) { source = ancestor; texture = found; used.set(key(ancestor), performance.now()); break; }
+      if (found) { source = ancestor; texture = found.texture; used.set(key(ancestor), performance.now()); break; }
     }
     if (source) patches.push({ ...tile, sourceZ: source.z, sourceX: source.x, sourceY: source.y, texture });
   }
   pump();
-  globe.draw({ lon, lat, altitude: altitude(), pitch, exaggeration: exag, width: canvas.clientWidth, height: canvas.clientHeight }, patches);
+  globe.draw({ lon, lat, altitude: altitude(), focusHeight: focusHeight(), pitch, exaggeration: exag, width: canvas.clientWidth, height: canvas.clientHeight }, patches);
   zoomLabel.textContent = `標高 z${target} · ${Math.round(altitude() / 1000).toLocaleString('ja-JP')} km 上空`;
   pitchLabel.textContent = `傾き ${Math.round(pitch)}°`;
-  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB`;
+  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · PMTiles Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB · 高解像度 ${tileStats.requests} 枚 / ${(tileStats.bytes / 1048576).toFixed(1)} MiB`;
 }
 
 function setView(place: { lon: number; lat: number; zoom: number; pitch: number; exag: number }) {
@@ -174,7 +191,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-place]').forEach((button) =>
 });
 function changeZoom(delta: number) {
   const previous = zoom;
-  zoom = Math.max(0, Math.min(13, zoom + delta));
+  zoom = Math.max(0, Math.min(16, zoom + delta));
   if (previous < 4 && zoom >= 4 && pitch === 0) pitch = 55;
   if (zoom < 2) pitch = Math.min(pitch, 30);
   schedule();

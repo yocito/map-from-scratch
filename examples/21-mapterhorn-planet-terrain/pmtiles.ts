@@ -7,6 +7,7 @@ interface Entry { id: number; offset: number; length: number; run: number }
 interface Header { root: number; rootLength: number; leaves: number; data: number; minZoom: number; maxZoom: number }
 const T = [0, 1, 5, 21, 85, 341, 1365, 5461, 21845, 87381, 349525, 1398101, 5592405, 22369621, 89478485, 357913941, 1431655765, 5726623061];
 export const rangeStats = { requests: 0, bytes: 0 };
+export const tileStats = { requests: 0, bytes: 0 };
 
 async function read(start: number, length: number): Promise<Uint8Array> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -108,5 +109,19 @@ export async function openArchive() {
     }
     throw new Error('PMTiles の索引が深すぎます');
   }
-  return { tile, minZoom: h.minZoom, maxZoom: h.maxZoom };
+  // The global archive stops at z12. Mapterhorn's zxy service serves the
+  // separately archived z13-17 tiles; some high-resolution areas are absent.
+  async function terrainTile(z: number, x: number, y: number): Promise<Uint8Array | null> {
+    if (z <= h.maxZoom) return tile(z, x, y);
+    if (z > 17 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) return null;
+    const response = await fetch(`https://tiles.mapterhorn.com/${z}/${x}/${y}.webp`);
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`高解像度標高タイル: HTTP ${response.status}`);
+    if (!response.headers.get('content-type')?.startsWith('image/webp')) throw new Error('高解像度タイルが WebP ではありません');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    tileStats.requests++;
+    tileStats.bytes += bytes.length;
+    return bytes;
+  }
+  return { tile: terrainTile, minZoom: h.minZoom, maxZoom: 17 };
 }
