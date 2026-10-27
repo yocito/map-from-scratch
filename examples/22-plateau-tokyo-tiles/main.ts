@@ -56,7 +56,7 @@ function pumpCities() {
     cityQueue.delete(city);
     if (city.root || city.loading) continue;
     city.loading = true; cityPending++;
-    fetch(city.url).then(async response => {
+    fetch(city.url, { signal: AbortSignal.timeout(60000) }).then(async response => {
       if (!response.ok) throw new Error(`都市の tileset: HTTP ${response.status}`);
       return node((await response.json()).root, city.url);
     }).then(root => { city.root = root; })
@@ -77,7 +77,7 @@ function pumpTiles() {
     if (pending >= 5) break;
     if (!tile.url || tile.mesh || tile.loading || tile.failed) continue;
     tile.loading = true; pending++;
-    fetch(tile.url).then(async response => {
+    fetch(tile.url, { signal: AbortSignal.timeout(60000) }).then(async response => {
       if (!response.ok) throw new Error(`建物タイル: HTTP ${response.status}`);
       const bytes = await response.arrayBuffer();
       received += bytes.byteLength; requests++;
@@ -170,7 +170,7 @@ canvas.addEventListener('wheel', event => { event.preventDefault(); camera.dista
 new ResizeObserver(schedule).observe(canvas);
 
 try {
-  const response = await fetch(SOURCE);
+  const response = await fetch(SOURCE, { signal: AbortSignal.timeout(60000) });
   if (!response.ok) throw new Error(`PLATEAU データ一覧: HTTP ${response.status}`);
   const root = (await response.json()).root;
   cities = (root.children ?? []).filter((child: any) => {
