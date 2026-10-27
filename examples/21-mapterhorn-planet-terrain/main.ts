@@ -1,5 +1,5 @@
-// Browse Mapterhorn's global and regional PMTiles entirely by HTTP Range.
-import { openArchive, rangeStats } from './pmtiles.ts';
+// Read low-zoom CDN tiles and high-zoom regional PMTiles by HTTP Range.
+import { openArchive, rangeStats, tileStats } from './pmtiles.ts';
 import { createGlobe, type Patch } from './gl.ts';
 
 const R = 6371000;
@@ -52,7 +52,7 @@ function visible(tile: TileCoord, limit: number): boolean {
 function selectTiles(): { target: number; tiles: TileCoord[] } {
   const alt = altitude();
   const groundPixel = alt * 2 * Math.tan(Math.PI / 8) / Math.max(1, canvas.clientHeight) / Math.cos(pitch * radians);
-  let target = Math.max(0, Math.min(archive?.maxZoom ?? 12, Math.ceil(Math.log2(2 * Math.PI * R / (512 * groundPixel)))));
+  let target = Math.max(0, Math.min(archive?.maxZoomAt(lon, lat) ?? 12, Math.ceil(Math.log2(2 * Math.PI * R / (512 * groundPixel)))));
   const aspect = Math.max(1, canvas.clientWidth / Math.max(1, canvas.clientHeight));
   const p = pitch * radians;
   const span = Math.atan(alt / R * Math.tan(Math.PI / 8) * aspect * 1.7 / Math.cos(p) ** 2);
@@ -153,9 +153,11 @@ function draw() {
   const patches: Patch[] = [];
   for (const tile of tiles) {
     if (archive) {
-      if (target >= 5) enqueue(parent(tile, Math.min(5, target)));
-      if (target >= 9) enqueue(parent(tile, Math.min(9, target)));
-      if (target >= 13) enqueue(parent(tile, 12));
+      if (target >= 13) enqueue(parent(tile, 8));
+      else {
+        if (target >= 5) enqueue(parent(tile, 5));
+        if (target >= 9) enqueue(parent(tile, 9));
+      }
       enqueue(tile);
     }
     let source: TileCoord | null = null, texture: WebGLTexture | null = null;
@@ -170,7 +172,7 @@ function draw() {
   globe.draw({ lon, lat, altitude: altitude(), focusHeight: focusHeight(), pitch, exaggeration: exag, width: canvas.clientWidth, height: canvas.clientHeight }, patches);
   zoomLabel.textContent = `標高 z${target} · ${Math.round(altitude() / 1000).toLocaleString('ja-JP')} km 上空`;
   pitchLabel.textContent = `傾き ${Math.round(pitch)}°`;
-  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · PMTiles Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB`;
+  status.textContent = error || `${tiles.length} 区画 · 読込済 ${cache.size} · 読込中 ${pending.size} · CDN ${tileStats.requests} 枚 / ${(tileStats.bytes / 1048576).toFixed(1)} MiB · PMTiles Range ${rangeStats.requests} 回 / ${(rangeStats.bytes / 1048576).toFixed(1)} MiB`;
 }
 
 function setView(place: { lon: number; lat: number; zoom: number; pitch: number; exag: number }) {
@@ -224,6 +226,7 @@ new ResizeObserver(schedule).observe(canvas);
 schedule();
 try {
   archive = await openArchive();
+  archive.ready.then(schedule).catch(reason => { error = String(reason); schedule(); });
   schedule();
 } catch (reason) {
   error = String(reason);

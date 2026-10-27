@@ -1,14 +1,14 @@
 // PMTiles v3 header, gzip directories and WebP Terrarium tile bytes.
-// The global archive and bbox archives are both read with explicit HTTP Range.
-// A 200 response is cancelled before reading a potentially huge archive.
+// Low zoom uses the CDN's individual tiles. Regional PMTiles are read by Range.
+// A 200 Range response is cancelled before reading a huge archive.
 // Format: https://github.com/protomaps/PMTiles/blob/main/spec/v3/spec.md
-const PLANET = 'https://z.yuiseki.net/static/mapterhorn/2026-01-06/planet.pmtiles';
 const MANIFEST = 'https://download.mapterhorn.com/download_urls.json';
 interface Entry { id: number; offset: number; length: number; run: number }
 interface Header { root: number; rootLength: number; leaves: number; data: number; minZoom: number; maxZoom: number }
-interface ArchiveItem { url: string; min_lon: number; min_lat: number; max_lon: number; max_lat: number; min_zoom: number; max_zoom: number }
+interface ArchiveItem { url: string; size: number; min_lon: number; min_lat: number; max_lon: number; max_lat: number; min_zoom: number; max_zoom: number }
 const T = [0, 1, 5, 21, 85, 341, 1365, 5461, 21845, 87381, 349525, 1398101, 5592405, 22369621, 89478485, 357913941, 1431655765, 5726623061, 22906492245];
 export const rangeStats = { requests: 0, bytes: 0 };
+export const tileStats = { requests: 0, bytes: 0 };
 
 async function read(url: string, start: number, length: number): Promise<Uint8Array> {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -81,10 +81,10 @@ function find(entries: Entry[], id: number): Entry | null {
   return hit < 0 ? null : entries[hit];
 }
 
-async function openArchiveAt(url: string) {
-  // The global archive's root fits in 16 KiB. Some bbox archives are smaller
-  // than 16 KiB, so start those with just the fixed-length PMTiles header.
-  const first = await read(url, 0, url === PLANET ? 16384 : 127);
+async function openArchiveAt(url: string, size: number) {
+  // Most regional roots fit in 16 KiB. Empty archives can be smaller, so
+  // never request beyond the size given by the manifest.
+  const first = await read(url, 0, Math.min(16384, size));
   const view = new DataView(first.buffer, first.byteOffset, first.byteLength);
   if (new TextDecoder().decode(first.subarray(0, 7)) !== 'PMTiles' || first[7] !== 3) throw new Error('PMTiles v3 ではありません');
   const u64 = (offset: number) => Number(view.getBigUint64(offset, true));
@@ -116,26 +116,39 @@ async function openArchiveAt(url: string) {
 }
 
 export async function openArchive() {
-  const [planet, response] = await Promise.all([openArchiveAt(PLANET), fetch(MANIFEST)]);
-  if (!response.ok) throw new Error(`Mapterhorn のアーカイブ一覧: HTTP ${response.status}`);
-  const manifest = await response.json() as { items: ArchiveItem[] };
-  if (!Array.isArray(manifest.items)) throw new Error('Mapterhorn のアーカイブ一覧が読めません');
-  const areas = manifest.items.filter(item => item.min_zoom >= 13);
+  let areas: ArchiveItem[] | null = null;
+  const ready = fetch(MANIFEST).then(async response => {
+    if (!response.ok) throw new Error(`Mapterhorn のアーカイブ一覧: HTTP ${response.status}`);
+    const manifest = await response.json() as { items: ArchiveItem[] };
+    if (!Array.isArray(manifest.items)) throw new Error('Mapterhorn のアーカイブ一覧が読めません');
+    areas = manifest.items.filter(item => item.min_zoom >= 13);
+  });
   const archives = new Map<string, Promise<Awaited<ReturnType<typeof openArchiveAt>>>>();
+  const areaAt = (lon: number, lat: number) => areas?.find(a => lon >= a.min_lon && lon < a.max_lon && lat >= a.min_lat && lat < a.max_lat);
   async function terrainTile(z: number, x: number, y: number): Promise<Uint8Array | null> {
-    if (z <= planet.maxZoom) return planet.tile(z, x, y);
     if (z > 18 || x < 0 || y < 0 || x >= 2 ** z || y >= 2 ** z) return null;
+    if (z <= 12) {
+      const response = await fetch(`https://tiles.mapterhorn.com/${z}/${x}/${y}.webp`);
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`全球標高タイル: HTTP ${response.status}`);
+      if (!response.headers.get('content-type')?.startsWith('image/webp')) throw new Error('全球標高タイルが WebP ではありません');
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      tileStats.requests++;
+      tileStats.bytes += bytes.length;
+      return bytes;
+    }
+    await ready;
     const n = 2 ** z;
     const lon = (x + 0.5) / n * 360 - 180;
     const lat = (2 * Math.atan(Math.exp(Math.PI * (1 - 2 * (y + 0.5) / n))) - Math.PI / 2) * 180 / Math.PI;
-    const item = areas.find(a => z >= a.min_zoom && z <= a.max_zoom && lon >= a.min_lon && lon < a.max_lon && lat >= a.min_lat && lat < a.max_lat);
-    if (!item) return null;
+    const item = areaAt(lon, lat);
+    if (!item || z < item.min_zoom || z > item.max_zoom) return null;
     let archive = archives.get(item.url);
     if (!archive) {
-      archive = openArchiveAt(item.url).catch(reason => { archives.delete(item.url); throw reason; });
+      archive = openArchiveAt(item.url, item.size).catch(reason => { archives.delete(item.url); throw reason; });
       archives.set(item.url, archive);
     }
     return (await archive).tile(z, x, y);
   }
-  return { tile: terrainTile, minZoom: planet.minZoom, maxZoom: Math.max(planet.maxZoom, ...areas.map(item => item.max_zoom)) };
+  return { tile: terrainTile, ready, maxZoomAt: (lon: number, lat: number) => areaAt(lon, lat)?.max_zoom ?? 12 };
 }
